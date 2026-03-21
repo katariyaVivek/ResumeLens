@@ -11,6 +11,133 @@ An AI-powered resume screening chatbot using RAG and RAG Fusion to match job des
 - **Auth + DB**: Supabase
 - **File storage**: Cloudflare R2
 
+### System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        USER BROWSER                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
+│  │ Chat Input   │  │ Settings     │  │ Upload Resumes   │  │
+│  │ + RAG Toggle │  │ API Key/URL  │  │ CSV URL or File  │  │
+│  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘  │
+│         │                 │                    │            │
+│         └────────────┬────┴────────────────────┘            │
+│                      │ HTTP/SSE                             │
+└──────────────────────┼──────────────────────────────────────┘
+                       │
+                       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    RENDER.COM (Backend)                      │
+│                                                              │
+│  FastAPI ─┬─ /api/chat/stream    ──► LLM (user's key)       │
+│           ├─ /api/ingest         ──► Embed ──► Vector Store │
+│           ├─ /api/ingest/upload  ──► Embed ──► Vector Store │
+│           ├─ /api/models         ──► Provider's /models API │
+│           └─ /api/auth           ──► Supabase JWT           │
+│                                                              │
+└──────────┬──────────────────┬───────────────────────────────┘
+           │                  │
+     ┌─────┴─────┐    ┌──────┴──────┐
+     │ Pinecone  │    │  Supabase   │
+     │  (vectors)│    │  (Auth+DB)  │
+     └───────────┘    └─────────────┘
+```
+
+### Ingest Pipeline
+
+```
+CSV File (URL or upload)
+        │
+        ▼
+┌───────────────┐
+│  Read CSV     │  pandas reads content + id columns
+└───────┬───────┘
+        │
+        ▼
+┌───────────────┐
+│  Chunk Text   │  RecursiveCharacterTextSplitter
+│  1024 chars   │  chunk_size=1024, overlap=500
+│  500 overlap  │
+└───────┬───────┘
+        │
+        ▼
+┌───────────────┐
+│  Embed Chunks │  sentence-transformers/all-MiniLM-L6-v2
+│  → 384-dim    │  each chunk → 384-dimensional vector
+└───────┬───────┘
+        │
+        ▼
+┌───────────────┐
+│  Upsert to    │  Pinecone / Qdrant
+│  Vector Store │  index: resumelens-resumes
+│  (id, vector, │  metadata: {resume_id, chunk_index, document}
+│   metadata)   │
+└───────────────┘
+```
+
+### Query Pipeline
+
+```
+User types a question
+        │
+        ▼
+┌───────────────────┐
+│  Query Classifier │  LLM call — not keyword matching
+│  (classify once)  │
+└────────┬──────────┘
+         │
+    ┌────┴────┐
+    │         │
+    ▼         ▼
+┌────────┐ ┌────────────┐
+│ no_    │ │ retrieve_  │
+│retrieve│ │ applicant_ │
+│        │ │ jd or _id  │
+└───┬────┘ └─────┬──────┘
+    │             │
+    │        ┌────┴────┐
+    │        │  RAG    │
+    │        │  MODE?  │
+    │        └────┬────┘
+    │        ┌────┴────┐
+    │        │         │
+    │        ▼         ▼
+    │   ┌─────────┐ ┌───────────┐
+    │   │ Generic │ │   RAG     │
+    │   │   RAG   │ │  Fusion   │
+    │   └────┬────┘ └─────┬─────┘
+    │        │            │
+    │   embed query  generate 3-4
+    │        │      sub-queries
+    │        │            │
+    │        │       embed each
+    │        │      independently
+    │        │            │
+    │        │       ┌────┴────┐
+    │        │       │ RRF     │  reciprocal rank fusion
+    │        │       │ merge   │  score = Σ 1/(60+rank)
+    │        │       └────┬────┘
+    │        │            │
+    └────────┴────────────┘
+             │
+             ▼
+     ┌───────────────┐
+     │ Top-k docs    │  resume chunks with metadata
+     └───────┬───────┘
+             │
+             ▼
+     ┌───────────────┐
+     │  LLM (BYOK)  │  user's API key + model
+     │  + context    │  resumes as context for answer
+     └───────┬───────┘
+             │
+             ▼
+     ┌───────────────┐
+     │  SSE Stream   │  tokens streamed back to frontend
+     │  → Frontend   │  rendered with styled markdown
+     └───────────────┘
+```
+
 ## Features
 
 - **BYOK (Bring Your Own Key)** — users enter their own API key, base URL, and pick any model
@@ -78,11 +205,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 
 ## RAG Pipeline
 
-1. **Query classification** — routes to `retrieve_applicant_jd`, `retrieve_applicant_id`, or `no_retrieve`
-2. **Sub-query generation** (RAG Fusion) — LLM generates 3-4 focused queries
-3. **Retrieval** — vector similarity search per sub-query
-4. **Reciprocal Rank Fusion** — merge result lists by rank
-5. **Response generation** — LLM answers with structured candidate profiles
+See the **Query Pipeline** diagram above for the full flow. Key stages:
+
+1. **Query classification** — LLM routes to `retrieve_applicant_jd`, `retrieve_applicant_id`, or `no_retrieve`
+2. **RAG Fusion** — generates 3-4 sub-queries, retrieves independently, merges via reciprocal rank fusion
+3. **Generic RAG** — single similarity search for simpler queries
+4. **Response** — LLM generates structured candidate profiles (Role, Experience, Skills, Highlights)
 
 ## Color Palette
 
