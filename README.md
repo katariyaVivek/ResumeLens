@@ -1,53 +1,126 @@
-## Introducing a Chatbot for Resume Screening
+# ResumeLens — AI Resume Screening Chatbot
 
-This innovative solution is more efficient, user-friendly, and effective than traditional keyword-based methods.
+An AI-powered resume screening chatbot using RAG and RAG Fusion to match job descriptions against a resume database and answer recruiter queries in natural language.
 
-## How it Works
+## Architecture
 
-The chatbot uses a hybrid retrieval method to retrieve relevant resumes based on job descriptions. It employs two techniques:
+- **Frontend**: Next.js 14 (App Router, TypeScript) → Vercel
+- **Backend**: FastAPI (Python) → Render.com
+- **Vector store**: Pinecone or Qdrant Cloud (384-dim `all-MiniLM-L6-v2` embeddings)
+- **LLM**: BYOK (Bring Your Own Key) — supports OpenAI, Groq, Anthropic, Ollama, or any OpenAI-compatible API
+- **Auth + DB**: Supabase
+- **File storage**: Cloudflare R2
 
-**Adaptive Retrieval**: The chatbot uses RAG/RAG Fusion to search for similar resumes and narrow down the pool of applicants to the most relevant profiles.
+## Features
 
-**Keyword-based Retrieval**: When provided with applicant IDs, the chatbot retrieves additional information about specified candidates.
+- **BYOK (Bring Your Own Key)** — users enter their own API key, base URL, and pick any model
+- **Dynamic model fetching** — available models auto-populate from the provider's API
+- **RAG Fusion** — multi-query retrieval with reciprocal rank fusion for better recall
+- **Generic RAG** — single similarity search for faster, simpler queries
+- **RAG Mode Toggle** — switch between modes per conversation from the header
+- **Upload Resumes** — ingest CSV files via URL or direct file upload
+- **Browse Candidates** — list all indexed candidates with summaries
+- **Function Cards** — filter by job description, skills, experience, ID, or compare candidates
+- **Streaming responses** — real-time SSE streaming from backend to frontend
+- **Copy responses** — one-click copy on any assistant message
+- **Styled responses** — candidate cards with labeled badges (Role, Experience, Skills, Highlights)
 
-## Why Resume Screening Matters
+## Quick Start
 
-Despite the increasing number of applicants, there are limited tools that can effectively and reliably assist the screening process. Existing methods often rely on keyword-based approaches, which struggle to accurately handle the complexity of natural language in human-written documents. This project aims to address this gap by integrating LLM-based methods into the recruitment domain.
+### Backend
 
-## Why RAG/RAG Fusion Matters
+```bash
+cd backend
+pip install -r requirements.txt
+python -m uvicorn backend.main:app --reload --port 8000
+```
 
-RAG-like frameworks, such as RAG Fusion, enhance the reliability of chatbots by providing an external knowledge base for LLM agents. This increases the relevance and accuracy of generated answers, which is crucial in data-intensive environments like recruitment.
+### Frontend
 
-## Demo and Setup
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-You can access the demo chatbot interface here: Streamlit. The demo uses a synthetic resume dataset and a Kaggle job description dataset.
+### Environment Variables
 
-## System Description
+Copy `.env.example` to the respective `.env` files and fill in values:
 
-The chatbot structure is designed to be suitable for real-world use cases:
+```bash
+# backend/.env
+VECTOR_STORE_PROVIDER=pinecone
+PINECONE_API_KEY=
+PINECONE_INDEX_NAME=resumelens-resumes
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+SECRET_KEY=
 
-Chat History Access: The LLM is fed with the entire conversation and the latest retrieved documents for every message, allowing it to perform follow-up tasks.
-Query Classification: The LLM extracts necessary information to decide whether to toggle the retrieval process on/off.
-Small-to-Big Retrieval: The retrieval process is performed using text chunks for efficiency.
+# frontend/.env.local
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
 
-## Tech Stacks
+> **Note**: LLM API keys are NOT stored on the server. Users provide their own keys per request via the Settings panel.
 
-**The project uses**:
-Langchain, OpenAI, and HuggingFace for RAG pipeline and chatbot construction.
-Faiss for vector indexing and similarity retrieval.
-Streamlit for user interface development.
-Installation and Setup
+## API Endpoints
 
-## To set up the project locally:
-````
-Clone the project: git clone https://github.com/katariyaVivek/RS-RAG.git
-Install dependencies: pip install requirements.txt
-Run the Streamlit demo: streamlit run main/chatBot_interface.py
-````
-## Contributions
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/health` | Health check |
+| POST | `/api/chat` | Non-streaming chat |
+| POST | `/api/chat/stream` | Streaming SSE chat |
+| POST | `/api/ingest` | Bulk ingest resumes (CSV URL) |
+| POST | `/api/ingest/upload` | Upload and ingest CSV file |
+| POST | `/api/models` | Fetch available models from provider |
+| GET | `/api/auth/me` | Current user info |
 
-The demo chatbot is still a work in progress, and any suggestions, feedback, or contributions are highly appreciated! Please share them at the project's issue tracker.
+## RAG Pipeline
 
-## Acknowledgement
+1. **Query classification** — routes to `retrieve_applicant_jd`, `retrieve_applicant_id`, or `no_retrieve`
+2. **Sub-query generation** (RAG Fusion) — LLM generates 3-4 focused queries
+3. **Retrieval** — vector similarity search per sub-query
+4. **Reciprocal Rank Fusion** — merge result lists by rank
+5. **Response generation** — LLM answers with structured candidate profiles
 
-Inspired by RAG Fusion.
+## Color Palette
+
+The frontend uses a warm lavender-rose palette:
+
+| Role | Color |
+|------|-------|
+| Background | `#f9f5fc` |
+| Sidebar | `#2d2438` |
+| Accent / Buttons | `#9b6b82` |
+| User bubble | `#f2d9e3` |
+| Assistant bubble | `#e8dff0` |
+| Text | `#3e2f45` |
+| Borders | `#cbbfc8` |
+
+## Deployment
+
+See [DEPLOY.md](DEPLOY.md) for step-by-step deployment to Render.com and Vercel.
+
+| Service | Platform |
+|---------|----------|
+| Backend | Render.com |
+| Frontend | Vercel |
+| Vector store | Pinecone / Qdrant Cloud |
+| Auth + DB | Supabase |
+
+## Project Structure
+
+```
+ResumeLens/
+├── frontend/          # Next.js 14 chat UI
+├── backend/           # FastAPI RAG pipeline
+├── Data/              # Resume datasets + evaluation results
+├── docs/              # Architecture, API reference
+├── Evaluation/        # Metrics and evaluation notebooks
+├── Data Preprocessing/ # Data cleaning notebooks
+├── render.yaml        # Backend deployment config
+└── DEPLOY.md          # Deployment guide
+```
+
+See `AGENTS.md` files for detailed code conventions and rules.

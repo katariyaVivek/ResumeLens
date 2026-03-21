@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --sidebar-width: 280px;
+    --header-height: 60px;
+    --input-height: 80px;
+    --bg-primary: #f9f5fc;
+    --bg-lavender: #e8dff0;
+    --bg-pink: #f2d9e3;
+    --border-mauve: #cbbfc8;
+    --accent-rose: #9b6b82;
+    --text-dark: #3e2f45;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbbfc8 transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: #cbbfc8;
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: #9b6b82;
+  }
+}
+
+@layer components {
+  .function-card {
+    @apply flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all duration-150;
+    @apply bg-white/5 hover:bg-[#e8dff0]/25 border border-transparent hover:border-[#cbbfc8]/40;
+  }
+
+  .function-card.active {
+    @apply bg-[#f2d9e3]/30 border-[#9b6b82]/40;
+  }
+
+  .msg-bubble {
+    @apply max-w-[75%] px-4 py-3 rounded-2xl leading-relaxed;
+  }
+
+  .msg-bubble-user {
+    @apply bg-[#f2d9e3] text-[#3e2f45] rounded-br-md;
+  }
+
+  .msg-bubble-assistant {
+    @apply bg-[#e8dff0] text-[#3e2f45] rounded-bl-md;
+  }
+
+  .input-glow:focus-within {
+    box-shadow: 0 0 0 2px rgba(155, 107, 130, 0.3);
+  }
+
+  .modal-backdrop {
+    @apply fixed inset-0 bg-[#2d2438]/50 z-50 flex items-center justify-center p-4;
+  }
+
+  .modal-content {
+    @apply bg-[#f9f5fc] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4;
+  }
+
+  .modal-title {
+    @apply text-lg font-semibold text-[#3e2f45];
+  }
+
+  .modal-input {
+    @apply w-full px-3 py-2.5 rounded-xl border border-[#cbbfc8] bg-[#e8dff0]/30
+           text-sm text-[#3e2f45] placeholder:text-[#9b6b82]
+           focus:outline-none focus:border-[#9b6b82] focus:bg-white
+           transition-colors;
+  }
+
+  .modal-label {
+    @apply block text-xs font-medium text-[#3e2f45]/60 mb-1.5;
+  }
+
+  .modal-btn-primary {
+    @apply w-full py-2.5 rounded-xl bg-[#9b6b82] hover:bg-[#875a70]
+           text-white text-sm font-medium transition-colors
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .modal-btn-secondary {
+    @apply w-full py-2.5 rounded-xl border border-[#cbbfc8]
+           text-[#3e2f45] text-sm font-medium hover:bg-[#e8dff0]/40 transition-colors;
+  }
+
+  .rag-toggle {
+    @apply flex rounded-xl border border-[#cbbfc8] overflow-hidden text-xs;
+  }
+
+  .rag-toggle-btn {
+    @apply px-3 py-1.5 font-medium transition-colors cursor-pointer;
+  }
+
+  .rag-toggle-btn.active {
+    @apply bg-[#9b6b82] text-white;
+  }
+
+  .rag-toggle-btn:not(.active) {
+    @apply text-[#3e2f45]/50 hover:bg-[#e8dff0]/50;
+  }
+
+  .copy-btn {
+    @apply opacity-0 group-hover:opacity-100 p-1.5 rounded-lg
+           hover:bg-[#cbbfc8]/40 transition-all cursor-pointer text-[#9b6b82]
+           hover:text-[#3e2f45];
+  }
+
+  .upload-zone {
+    @apply relative border-2 border-dashed border-[#cbbfc8] rounded-xl p-6
+           text-center cursor-pointer hover:border-[#9b6b82]
+           hover:bg-[#e8dff0]/30 transition-all;
+  }
+
+  .upload-zone.active {
+    @apply border-[#9b6b82] bg-[#f2d9e3]/25;
+  }
+
+  .upload-input {
+    @apply absolute inset-0 w-full h-full cursor-pointer;
+    opacity: 0;
+  }
+}

@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+.next/
+
+# Next.js
+next-env.d.ts
+
+# Environment files
+backend/.env
+frontend/.env.local
+
+# Vercel
+.vercel/
+
+# Misc
+.DS_Store
+.ruff_cache/
+nul
+design/
+*.log
+AGENTS.md
+backend/AGENTS.md
+frontend/AGENTS.md
+DEPLOY.md
