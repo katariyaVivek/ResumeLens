@@ -152,10 +152,10 @@ function parseCandidates(text: string): Candidate[] | null {
 
     const extract = (label: string) => {
       const patterns: Record<string, RegExp> = {
-        Role: /-\s+\*\*Role:?\*\*\s*(.+?)(?=\n)/si,
-        Experience: /-\s+\*\*Experience:?\*\*\s*(.+?)(?=\n)/si,
-        Skills: /-\s+\*\*Skills:?\*\*\s*(.+?)(?=\n)/si,
-        Highlights: /-\s+\*\*Highlights:?\*\*\s*(.+?)(?=\n)/si,
+        Role: /-\s+\*\*Role:?\*\*\s*(.+?)(?=\n|$)/si,
+        Experience: /-\s+\*\*Experience:?\*\*\s*(.+?)(?=\n|$)/si,
+        Skills: /-\s+\*\*Skills:?\*\*\s*(.+?)(?=\n|$)/si,
+        Highlights: /-\s+\*\*Highlights:?\*\*\s*(.+?)(?=\n|$)/si,
       };
       const m = section.match(patterns[label]);
       return m ? m[1].trim().replace(/^["']|[""]$/g, "") : "";
@@ -165,8 +165,6 @@ function parseCandidates(text: string): Candidate[] | null {
     const experience = extract("Experience");
     const skillsStr = extract("Skills");
     const highlights = extract("Highlights");
-
-    if (!role && !experience && !skillsStr) continue;
 
     const skills = skillsStr
       ? skillsStr.split(",").map((s) => s.trim()).filter(Boolean)
