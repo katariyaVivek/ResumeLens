@@ -5,7 +5,7 @@ sys.dont_write_bytecode = True
 import logging
 from typing import List
 
-from sentence_transformers import SentenceTransformer
+from fastembed import TextEmbedding
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +20,18 @@ class EmbeddingsService:
     @property
     def model(self):
         if self._model is None:
-            self._model = SentenceTransformer(self.model_name)
+            logger.info(f"Loading FastEmbed model: {self.model_name}")
+            self._model = TextEmbedding(model_name=self.model_name)
+            logger.info(f"FastEmbed model loaded: {self.model_name}")
         return self._model
 
     def embed_query(self, query: str) -> List[float]:
-        embedding = self.model.encode(query, convert_to_numpy=True)
-        return embedding.tolist()
+        result = list(self.model.embed([query]))
+        return result[0].tolist()
 
     def embed_documents(self, documents: List[str]) -> List[List[float]]:
-        embeddings = self.model.encode(documents, convert_to_numpy=True)
-        return embeddings.tolist()
+        result = list(self.model.embed(documents))
+        return [r.tolist() for r in result]
 
     async def embed_query_async(self, query: str) -> List[float]:
         return self.embed_query(query)
