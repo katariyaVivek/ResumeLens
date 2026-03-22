@@ -146,9 +146,15 @@ export async function getCurrentUser(): Promise<User> {
   return res.json();
 }
 
+export async function wakeUp(): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/api/health`, { method: "GET" });
+  } catch {}
+}
+
 export async function fetchModels(apiKey: string, apiBase: string): Promise<string[]> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), 45000);
 
   try {
     const res = await fetch(`${BASE_URL}/api/models`, {

@@ -412,27 +412,48 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
+  // Wake up backend on page load
+  useEffect(() => {
+    import("@/lib/api").then((api) => api.wakeUp());
+  }, []);
+
+  // Fetch models with retry
   useEffect(() => {
     if (!apiKey || !baseUrl) {
       setFetchedModels([]);
       return;
     }
+    let cancelled = false;
     const timer = setTimeout(async () => {
       setLoadingModels(true);
-      try {
-        const { fetchModels: apiFetchModels } = await import("@/lib/api");
-        const models = await apiFetchModels(apiKey, baseUrl);
-        setFetchedModels(models);
-        if (models.length > 0 && !models.includes(modelNameRef.current)) {
-          setModelName(models[0]);
+      const { fetchModels: apiFetchModels, wakeUp } = await import("@/lib/api");
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (cancelled) return;
+        if (attempt > 0) {
+          await wakeUp();
+          await new Promise((r) => setTimeout(r, 3000));
         }
-      } catch {
+        try {
+          const models = await apiFetchModels(apiKey, baseUrl);
+          if (cancelled) return;
+          if (models.length > 0) {
+            setFetchedModels(models);
+            if (!models.includes(modelNameRef.current)) {
+              setModelName(models[0]);
+            }
+            setLoadingModels(false);
+            return;
+          }
+        } catch {}
+      }
+
+      if (!cancelled) {
         setFetchedModels([]);
-      } finally {
         setLoadingModels(false);
       }
     }, 800);
-    return () => clearTimeout(timer);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [apiKey, baseUrl]);
 
   const handleNewChat = () => {
@@ -685,7 +706,11 @@ export default function ChatPage() {
             {/* Settings button */}
             <div className="relative">
               <button
-                onClick={() => setShowSettings(!showSettings)}
+                onClick={() => {
+                  const opening = !showSettings;
+                  setShowSettings(opening);
+                  if (opening) import("@/lib/api").then((api) => api.wakeUp());
+                }}
                 className={`p-2 rounded-xl transition-colors
                   ${showSettings ? "bg-[#9b6b82] text-white" : "text-[#9b6b82] hover:bg-[#e8dff0]"}`}
               >
@@ -785,11 +810,11 @@ export default function ChatPage() {
                     {showModels && (
                       <div className="mt-1 rounded-xl bg-[#e8dff0] border border-[#cbbfc8] overflow-hidden max-h-[150px] overflow-y-auto">
                         {loadingModels && (
-                          <p className="px-3 py-2 text-[11px] text-[#9b6b82] animate-pulse">Fetching models... (may take 30s if server is waking up)</p>
+                          <p className="px-3 py-2 text-[11px] text-[#9b6b82] animate-pulse">Waking up server & fetching models...</p>
                         )}
                         {!loadingModels && fetchedModels.length === 0 && (
                           <p className="px-3 py-2 text-[11px] text-[#3e2f45]/40">
-                            {apiKey ? "No models found — check key and URL" : "Enter API key to fetch models"}
+                            {apiKey ? "No chat models found — you can still type a model name manually" : "Enter API key to fetch models"}
                           </p>
                         )}
                         {!loadingModels && fetchedModels.map((m) => (
