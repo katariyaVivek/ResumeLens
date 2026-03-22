@@ -443,6 +443,7 @@ export default function ChatPage() {
               setModelName(models[0]);
             }
             setLoadingModels(false);
+            setShowSettings(false);
             return;
           }
         } catch {}
@@ -820,7 +821,7 @@ export default function ChatPage() {
                         {!loadingModels && fetchedModels.map((m) => (
                           <button
                             key={m}
-                            onClick={() => { setModelName(m); setShowModels(false); }}
+                            onClick={() => { setModelName(m); setShowModels(false); setShowSettings(false); }}
                             className={`w-full px-3 py-1.5 text-[11px] text-left hover:bg-[#f2d9e3]/40 transition-colors
                                       ${modelName === m ? "text-[#9b6b82] font-medium" : "text-[#3e2f45]/60"}`}
                           >
