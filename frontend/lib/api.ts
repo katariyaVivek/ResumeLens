@@ -36,36 +36,43 @@ export async function sendChatMessage(payload: ChatRequest): Promise<ChatRespons
 
 export async function streamChatMessage(
   payload: ChatRequest,
-  onChunk: (chunk: string) => void
+  onChunk: (text: string) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   const headers = await authHeaders();
-  
+
   const res = await fetch(`${BASE_URL}/api/chat/stream`, {
     method: "POST",
     headers,
     body: JSON.stringify(payload),
+    signal,
   });
-  
+
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
     throw new Error(error.detail || `Chat failed: ${res.status}`);
   }
-  
+
   const reader = res.body?.getReader();
   const decoder = new TextDecoder();
-  
+
   if (!reader) {
     throw new Error("No response body");
   }
-  
+
   while (true) {
+    if (signal?.aborted) {
+      reader.cancel();
+      return;
+    }
+
     const { done, value } = await reader.read();
-    
+
     if (done) break;
-    
+
     const chunk = decoder.decode(value);
     const lines = chunk.split("\n");
-    
+
     for (const line of lines) {
       if (line.startsWith("data: ")) {
         const data = line.slice(6);

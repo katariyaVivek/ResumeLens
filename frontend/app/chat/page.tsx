@@ -26,10 +26,12 @@ import {
   Key,
   Globe,
   Cpu,
-  Settings,
   Eye,
   EyeOff,
   ChevronDown,
+  Settings,
+  Square,
+  Pencil,
 } from "lucide-react";
 
 const PROVIDER_PRESETS = [
@@ -382,6 +384,9 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [ragMode, setRagMode] = useState<RAGMode>("RAG Fusion");
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
 
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("https://api.openai.com/v1");
@@ -468,6 +473,10 @@ export default function ChatPage() {
     setInput("");
     setActiveFunction(null);
     setIsLoading(true);
+    setEditingIndex(null);
+
+    const abort = new AbortController();
+    abortRef.current = abort;
 
     try {
       const chatHistory = messages
@@ -495,15 +504,54 @@ export default function ChatPage() {
           }
           return [...prev, { role: "assistant", content: responseText }];
         });
-      });
-    } catch {
+      }, abort.signal);
+    } catch (err) {
+      if (abort.signal.aborted) return;
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: "Sorry, I encountered an error. Please try again." },
       ]);
     } finally {
       setIsLoading(false);
+      abortRef.current = null;
     }
+  };
+
+  const handleStop = () => {
+    abortRef.current?.abort();
+  };
+
+  const handleEditStart = (index: number) => {
+    setEditingIndex(index);
+    setEditText(messages[index].content);
+  };
+
+  const handleEditCancel = () => {
+    setEditingIndex(null);
+    setEditText("");
+  };
+
+  const handleEditResend = () => {
+    if (editingIndex === null || !editText.trim()) return;
+    const newMessages = messages.slice(0, editingIndex);
+    setMessages(newMessages);
+    setEditingIndex(null);
+    setEditText("");
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.value = editText.trim();
+        setInput(editText.trim());
+        handleSubmit();
+      }
+    }, 50);
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleEditResend();
+    }
+    if (e.key === "Escape") handleEditCancel();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -825,22 +873,59 @@ export default function ChatPage() {
 
                   {/* Bubble */}
                   <div className="flex flex-col gap-1 min-w-0 flex-1">
-                    <div
-                      className={`msg-bubble relative group ${
-                        message.role === "user" ? "msg-bubble-user" : "msg-bubble-assistant"
-                      }`}
-                    >
-                      <div className={message.role === "user" ? "" : "prose-sm"}>
-                        <ReactMarkdown components={message.role === "assistant" ? markdownComponents : undefined}>
-                          {message.content}
-                        </ReactMarkdown>
-                      </div>
-                      {message.role === "assistant" && message.content && (
-                        <div className="absolute -bottom-1 -right-1">
-                          <CopyButton text={message.content} />
+                    {editingIndex === index ? (
+                      /* Edit mode */
+                      <div className="msg-bubble msg-bubble-user">
+                        <textarea
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onKeyDown={handleEditKeyDown}
+                          className="w-full bg-transparent text-[13px] text-[#3e2f45] resize-none outline-none min-h-[40px]"
+                          rows={2}
+                          autoFocus
+                        />
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={handleEditResend}
+                            className="px-3 py-1 rounded-lg bg-[#9b6b82] text-white text-[11px] font-medium hover:bg-[#875a70] transition-colors"
+                          >
+                            Resend
+                          </button>
+                          <button
+                            onClick={handleEditCancel}
+                            className="px-3 py-1 rounded-lg bg-[#cbbfc8]/30 text-[#3e2f45]/60 text-[11px] font-medium hover:bg-[#cbbfc8]/50 transition-colors"
+                          >
+                            Cancel
+                          </button>
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    ) : (
+                      <div
+                        className={`msg-bubble relative group ${
+                          message.role === "user" ? "msg-bubble-user" : "msg-bubble-assistant"
+                        }`}
+                      >
+                        <div className={message.role === "user" ? "" : "prose-sm"}>
+                          <ReactMarkdown components={message.role === "assistant" ? markdownComponents : undefined}>
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                        {message.role === "assistant" && message.content && (
+                          <div className="absolute -bottom-1 -right-1">
+                            <CopyButton text={message.content} />
+                          </div>
+                        )}
+                        {message.role === "user" && (
+                          <button
+                            onClick={() => handleEditStart(index)}
+                            className="absolute -top-1 -right-1 opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-[#e8dff0]/50 transition-all cursor-pointer text-[#b2a3a4] hover:text-[#3e2f45]"
+                            title="Edit message"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    )}
                     <span className={`text-[10px] text-[#cbbfc8] px-1 ${message.role === "user" ? "text-right" : ""}`}>
                       {formatTime(new Date())}
                     </span>
@@ -911,22 +996,23 @@ export default function ChatPage() {
                 defaultValue={input}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask about resumes or select a function..."
-                disabled={isLoading}
                 rows={1}
                 className="flex-1 px-4 py-3.5 pr-14 bg-transparent text-sm text-[#3e2f45]
                          placeholder:text-[#9b6b82] resize-none outline-none
-                         disabled:opacity-50 leading-relaxed max-h-40"
+                         leading-relaxed max-h-40"
                 style={{ minHeight: "52px" }}
               />
               <button
-                type="submit"
-                disabled={isLoading}
-                className="absolute right-2 bottom-2 w-9 h-9 rounded-xl
-                         bg-[#9b6b82] hover:bg-[#875a70] disabled:bg-[#cbbfc8]
-                         disabled:cursor-not-allowed transition-colors
-                         flex items-center justify-center"
+                type={isLoading ? "button" : "submit"}
+                onClick={isLoading ? handleStop : undefined}
+                className={`absolute right-2 bottom-2 w-9 h-9 rounded-xl
+                         transition-colors flex items-center justify-center
+                         ${isLoading
+                           ? "bg-[#f2d9e3] hover:bg-[#d4a0b4] text-[#9b6b82]"
+                           : "bg-[#9b6b82] hover:bg-[#875a70] text-white"
+                         }`}
               >
-                <Send className="w-4 h-4 text-white disabled:text-white/50" />
+                {isLoading ? <Square className="w-3.5 h-3.5" /> : <Send className="w-4 h-4" />}
               </button>
             </div>
             <p className="text-[10px] text-[#cbbfc8] mt-1.5 px-1 text-center">
