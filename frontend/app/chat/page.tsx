@@ -443,7 +443,6 @@ export default function ChatPage() {
               setModelName(models[0]);
             }
             setLoadingModels(false);
-            setShowSettings(false);
             return;
           }
         } catch {}
