@@ -140,14 +140,23 @@ export async function getCurrentUser(): Promise<User> {
 }
 
 export async function fetchModels(apiKey: string, apiBase: string): Promise<string[]> {
-  const res = await fetch(`${BASE_URL}/api/models`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ api_key: apiKey, api_base: apiBase }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
 
-  if (!res.ok) return [];
+  try {
+    const res = await fetch(`${BASE_URL}/api/models`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: apiKey, api_base: apiBase }),
+      signal: controller.signal,
+    });
 
-  const data = await res.json();
-  return data.models ?? [];
+    clearTimeout(timer);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.models ?? [];
+  } catch {
+    clearTimeout(timer);
+    return [];
+  }
 }

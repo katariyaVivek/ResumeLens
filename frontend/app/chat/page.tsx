@@ -737,7 +737,7 @@ export default function ChatPage() {
                     {showModels && (
                       <div className="mt-1 rounded-xl bg-[#e8dff0] border border-[#cbbfc8] overflow-hidden max-h-[150px] overflow-y-auto">
                         {loadingModels && (
-                          <p className="px-3 py-2 text-[11px] text-[#9b6b82] animate-pulse">Fetching models...</p>
+                          <p className="px-3 py-2 text-[11px] text-[#9b6b82] animate-pulse">Fetching models... (may take 30s if server is waking up)</p>
                         )}
                         {!loadingModels && fetchedModels.length === 0 && (
                           <p className="px-3 py-2 text-[11px] text-[#3e2f45]/40">
