@@ -1,12 +1,12 @@
 # ResumeLens — AI Resume Screening Chatbot
 
-An AI-powered resume screening chatbot using RAG and RAG Fusion to match job descriptions against a resume database and answer recruiter queries in natural language.
+An AI-powered resume screening chatbot using RAG and RAG Fusion to match job descriptions against a database of resumes and answer recruiter queries in natural language.
 
 ## Architecture
 
 - **Frontend**: Next.js 14 (App Router, TypeScript) → Vercel
 - **Backend**: FastAPI (Python) → Render.com
-- **Vector store**: Pinecone or Qdrant Cloud (384-dim `all-MiniLM-L6-v2` embeddings)
+- **Vector store**: Pinecone or Qdrant Cloud (384-dim `all-MiniLM-L6-v2` embeddings via FastEmbed/ONNX)
 - **LLM**: BYOK (Bring Your Own Key) — supports OpenAI, Groq, Anthropic, Ollama, or any OpenAI-compatible API
 - **Auth + DB**: Supabase
 - **File storage**: Cloudflare R2
@@ -19,6 +19,7 @@ An AI-powered resume screening chatbot using RAG and RAG Fusion to match job des
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐  │
 │  │ Chat Input   │  │ Settings     │  │ Upload Resumes   │  │
 │  │ + RAG Toggle │  │ API Key/URL  │  │ CSV URL or File  │  │
+│  │ + Stop/Edit  │  │ + Model Pick │  │                  │  │
 │  └──────┬───────┘  └──────┬───────┘  └────────┬─────────┘  │
 │         │                 │                    │            │
 │         └────────────┬────┴────────────────────┘            │
@@ -35,6 +36,7 @@ An AI-powered resume screening chatbot using RAG and RAG Fusion to match job des
 │           ├─ /api/models         ──► Provider's /models API │
 │           └─ /api/auth           ──► Supabase JWT           │
 │                                                              │
+│  Embeddings: FastEmbed (ONNX) — ~50MB RAM, no PyTorch       │
 └──────────┬──────────────────┬───────────────────────────────┘
            │                  │
      ┌─────┴─────┐    ┌──────┴──────┐
@@ -62,8 +64,8 @@ CSV File (URL or upload)
         │
         ▼
 ┌───────────────┐
-│  Embed Chunks │  sentence-transformers/all-MiniLM-L6-v2
-│  → 384-dim    │  each chunk → 384-dimensional vector
+│  Embed Chunks │  FastEmbed (ONNX Runtime)
+│  → 384-dim    │  all-MiniLM-L6-v2, 384-dimensional vectors
 └───────┬───────┘
         │
         ▼
@@ -142,6 +144,8 @@ User types a question
 
 - **BYOK (Bring Your Own Key)** — users enter their own API key, base URL, and pick any model
 - **Dynamic model fetching** — available models auto-populate from the provider's API
+- **Stop generation** — interrupt streaming responses mid-generation
+- **Edit & resend** — edit any user message and resend from that point
 - **RAG Fusion** — multi-query retrieval with reciprocal rank fusion for better recall
 - **Generic RAG** — single similarity search for faster, simpler queries
 - **RAG Mode Toggle** — switch between modes per conversation from the header
@@ -228,7 +232,7 @@ The frontend uses a warm lavender-rose palette:
 
 ## Deployment
 
-See [DEPLOY.md](DEPLOY.md) for step-by-step deployment to Render.com and Vercel.
+Deploy to **Render.com** (backend) and **Vercel** (frontend).
 
 | Service | Platform |
 |---------|----------|
@@ -237,18 +241,29 @@ See [DEPLOY.md](DEPLOY.md) for step-by-step deployment to Render.com and Vercel.
 | Vector store | Pinecone / Qdrant Cloud |
 | Auth + DB | Supabase |
 
+### Quick Deploy Steps
+
+1. **Pinecone** — create index `resumelens-resumes`, 384 dimensions, cosine metric
+2. **Supabase** — create project, copy URL + keys
+3. **Render** — connect repo, set build command `pip install -r backend/requirements.txt`, start command `sh -c "PYTHONPATH=. uvicorn backend.main:app --host 0.0.0.0 --port $PORT"`
+4. **Vercel** — connect repo, root directory `frontend`, set `NEXT_PUBLIC_API_URL` to your Render URL
+
 ## Project Structure
 
 ```
 ResumeLens/
-├── frontend/          # Next.js 14 chat UI
-├── backend/           # FastAPI RAG pipeline
-├── Data/              # Resume datasets + evaluation results
-├── docs/              # Architecture, API reference
-├── Evaluation/        # Metrics and evaluation notebooks
-├── Data Preprocessing/ # Data cleaning notebooks
-├── render.yaml        # Backend deployment config
-└── DEPLOY.md          # Deployment guide
+├── frontend/
+│   ├── app/               # Next.js pages + components
+│   ├── lib/               # API client, Supabase
+│   ├── types/             # TypeScript types
+│   └── package.json
+├── backend/
+│   ├── routers/           # API endpoints
+│   ├── services/          # RAG, LLM, embeddings, vector store
+│   ├── models/            # Pydantic schemas
+│   └── requirements.txt
+├── Data/                  # Resume datasets
+├── docs/                  # Architecture, API reference
+├── render.yaml            # Backend deploy config
+└── .github/workflows/     # CI/CD
 ```
-
-See `AGENTS.md` files for detailed code conventions and rules.
