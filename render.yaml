@@ -3,8 +3,8 @@ services:
     name: resumelens-backend
     runtime: python
     plan: free
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: sh -c "PYTHONPATH=. uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+    buildCommand: pip install -r backend/requirements.txt && python -c "from fastembed import TextEmbedding; TextEmbedding(model_name='sentence-transformers/all-MiniLM-L6-v2')"
+    startCommand: sh -c "exec uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.11"
@@ -22,5 +22,7 @@ services:
         generateValue: true
       - key: ENVIRONMENT
         value: production
+      - key: FRONTEND_URL
+        value: https://resume-lens-eight.vercel.app
       - key: GROQ_API_KEY
         sync: false
