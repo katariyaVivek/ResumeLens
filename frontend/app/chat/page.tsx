@@ -118,6 +118,131 @@ function preprocessMarkdown(text: string): string {
   return text;
 }
 
+interface Candidate {
+  name: string;
+  role: string;
+  experience: string;
+  skills: string[];
+  highlights: string;
+  isBestMatch: boolean;
+}
+
+function parseCandidates(text: string): Candidate[] | null {
+  const candidates: Candidate[] = [];
+  const sections = text.split(/(?=^## )/m).filter((s) => s.trim());
+
+  for (const section of sections) {
+    const nameMatch = section.match(/^##\s+(.+)/);
+    if (!nameMatch) continue;
+
+    const name = nameMatch[1].trim();
+    const isBestMatch = name.toLowerCase().includes("best match");
+
+    if (isBestMatch) {
+      candidates.push({
+        name: "Best Match",
+        role: "",
+        experience: "",
+        skills: [],
+        highlights: section.replace(/^##.*\n?/, "").trim(),
+        isBestMatch: true,
+      });
+      continue;
+    }
+
+    const extract = (label: string) => {
+      const re = new RegExp(`\\*\\*${label}:?\\*\\*\\s*(.+?)(?=\\n-|\\n\\*|\\n\\n|$)`, "si");
+      const m = section.match(re);
+      return m ? m[1].trim().replace(/^["']|["']$/g, "") : "";
+    };
+
+    const role = extract("Role");
+    const experience = extract("Experience");
+    const skillsStr = extract("Skills");
+    const highlights = extract("Highlights");
+
+    if (!role && !experience && !skillsStr) continue;
+
+    const skills = skillsStr
+      ? skillsStr.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+
+    candidates.push({ name, role, experience, skills, highlights, isBestMatch: false });
+  }
+
+  return candidates.length > 0 ? candidates : null;
+}
+
+function CandidateCard({ candidate }: { candidate: Candidate }) {
+  const initial = candidate.name.charAt(0).toUpperCase();
+
+  if (candidate.isBestMatch) {
+    return (
+      <div className="mt-3 p-3 rounded-xl bg-[#f2d9e3]/30 border border-[#9b6b82]/30">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-sm">⭐</span>
+          <span className="text-xs font-semibold text-[#9b6b82] uppercase tracking-wide">Best Match</span>
+        </div>
+        <p className="text-[13px] text-[#3e2f45]/80 leading-relaxed">{candidate.highlights}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 p-4 rounded-xl bg-[#e8dff0]/20 border border-[#cbbfc8] hover:border-[#9b6b82]/40 transition-colors">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-9 h-9 rounded-full bg-[#f2d9e3] flex items-center justify-center flex-shrink-0">
+          <span className="text-sm font-bold text-[#9b6b82]">{initial}</span>
+        </div>
+        <div>
+          <h4 className="text-sm font-semibold text-[#3e2f45]">{candidate.name}</h4>
+          {candidate.role && (
+            <p className="text-xs text-[#3e2f45]/50">{candidate.role}</p>
+          )}
+        </div>
+      </div>
+
+      {/* Experience */}
+      {candidate.experience && (
+        <div className="mb-2">
+          <span className="inline-block px-2 py-0.5 rounded-md bg-[#f2d9e3]/30 text-[11px] font-medium text-[#9b6b82]">
+            {candidate.experience}
+          </span>
+        </div>
+      )}
+
+      {/* Skills */}
+      {candidate.skills.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {candidate.skills.map((skill, i) => (
+            <span
+              key={i}
+              className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                i % 2 === 0
+                  ? "bg-[#e8dff0] text-[#3e2f45]"
+                  : "bg-[#f2d9e3]/40 text-[#9b6b82]"
+              }`}
+            >
+              {skill}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Highlights */}
+      {candidate.highlights && (
+        <div className="border-l-2 border-[#9b6b82]/50 pl-3 mt-2">
+          <p className="text-[12px] text-[#3e2f45]/70 leading-relaxed">
+            <span className="text-[#9b6b82] mr-1">★</span>
+            {candidate.highlights}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const markdownComponents = {
   h2: ({ children }: { children?: React.ReactNode }) => {
     const text = String(children);
@@ -930,11 +1055,27 @@ export default function ChatPage() {
                           message.role === "user" ? "msg-bubble-user" : "msg-bubble-assistant"
                         }`}
                       >
-                        <div className={message.role === "user" ? "" : "prose-sm"}>
-                          <ReactMarkdown components={message.role === "assistant" ? markdownComponents : undefined}>
-                            {message.content}
-                          </ReactMarkdown>
-                        </div>
+                        {message.role === "assistant" ? (() => {
+                          const candidates = parseCandidates(message.content);
+                          if (candidates) {
+                            return (
+                              <div className="space-y-0">
+                                {candidates.map((c, i) => (
+                                  <CandidateCard key={i} candidate={c} />
+                                ))}
+                              </div>
+                            );
+                          }
+                          return (
+                            <div className="prose-sm">
+                              <ReactMarkdown components={markdownComponents}>
+                                {message.content}
+                              </ReactMarkdown>
+                            </div>
+                          );
+                        })() : (
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        )}
                         {message.role === "assistant" && message.content && (
                           <div className="absolute -bottom-1 -right-1">
                             <CopyButton text={message.content} />

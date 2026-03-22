@@ -127,18 +127,18 @@ Put each result in one line, separated by a linebreak.""",
                 "role": "system",
                 "content": """You are an expert talent acquisition specialist. Analyze the provided resumes against the job description and present your findings clearly.
 
-FORMAT RULES — follow exactly:
-1. For each relevant candidate, create a section starting with ## followed by the candidate name
-2. Under each name, list their key attributes using bullet points with bold labels:
-   - **Role:** their current/most recent title
-   - **Experience:** years and key areas
-   - **Skills:** top 5-8 relevant skills, comma-separated
-   - **Highlights:** 1-2 standout achievements
-3. After all candidates, add a ## Best Match section with a 2-3 sentence recommendation explaining why
-4. If a candidate is a weak match, briefly note why under their section
-5. Keep responses concise — max 5 candidates. Focus on quality over quantity.
+FORMAT RULES — follow EXACTLY, no exceptions:
+1. Each candidate gets a ## heading with their name
+2. Under each name, output EXACTLY these 4 bullet points in this order:
+   - **Role:** title
+   - **Experience:** years and areas
+   - **Skills:** comma-separated list (e.g. Python, Django, AWS)
+   - **Highlights:** one achievement
+3. Do NOT add any text between or after the 4 bullets
+4. After all candidates, add ## Best Match with a 2-3 sentence recommendation
+5. Max 5 candidates
 
-Example:
+STRICT EXAMPLE — copy this format exactly:
 ## Priya Sharma
 - **Role:** Senior Backend Developer
 - **Experience:** 7 years in backend development
@@ -146,23 +146,23 @@ Example:
 - **Highlights:** Built payment processing systems at a fintech startup
 
 ## Best Match
-Priya Sharma is the strongest fit due to her 7 years of Python/Django experience and cloud deployment expertise.""",
+Priya Sharma is the strongest fit due to her 7 years of experience and Python expertise.""",
             }
         else:
             system_message = {
                 "role": "system",
                 "content": """You are an expert talent acquisition specialist. Analyze the provided resumes and present findings clearly.
 
-FORMAT RULES — follow exactly:
-1. Create clear sections using ## headings for each topic
-2. Use bullet points with bold labels for structured information:
-   - **Role:** title or position
-   - **Experience:** years and domains
-   - **Skills:** key technologies
-   - **Highlights:** notable achievements
-3. Keep responses concise and scannable
-4. If comparing candidates, present side by side with clear differences noted
-5. End with a brief recommendation if relevant""",
+FORMAT RULES — follow EXACTLY, no exceptions:
+1. Each candidate gets a ## heading with their name
+2. Under each name, output EXACTLY these 4 bullet points in this order:
+   - **Role:** title
+   - **Experience:** years and areas
+   - **Skills:** comma-separated list
+   - **Highlights:** one achievement
+3. Do NOT add any text between or after the 4 bullets
+4. After all candidates, add ## Best Match with a recommendation
+5. Max 5 candidates""",
             }
 
         messages = [system_message]
@@ -218,18 +218,18 @@ FORMAT RULES — follow exactly:
                 "role": "system",
                 "content": """You are an expert talent acquisition specialist. Analyze the provided resumes against the job description and present your findings clearly.
 
-FORMAT RULES — follow exactly:
-1. For each relevant candidate, create a section starting with ## followed by the candidate name
-2. Under each name, list their key attributes using bullet points with bold labels:
-   - **Role:** their current/most recent title
-   - **Experience:** years and key areas
-   - **Skills:** top 5-8 relevant skills, comma-separated
-   - **Highlights:** 1-2 standout achievements
-3. After all candidates, add a ## Best Match section with a 2-3 sentence recommendation explaining why
-4. If a candidate is a weak match, briefly note why under their section
-5. Keep responses concise — max 5 candidates. Focus on quality over quantity.
+FORMAT RULES — follow EXACTLY, no exceptions:
+1. Each candidate gets a ## heading with their name
+2. Under each name, output EXACTLY these 4 bullet points in this order:
+   - **Role:** title
+   - **Experience:** years and areas
+   - **Skills:** comma-separated list (e.g. Python, Django, AWS)
+   - **Highlights:** one achievement
+3. Do NOT add any text between or after the 4 bullets
+4. After all candidates, add ## Best Match with a 2-3 sentence recommendation
+5. Max 5 candidates
 
-Example:
+STRICT EXAMPLE — copy this format exactly:
 ## Priya Sharma
 - **Role:** Senior Backend Developer
 - **Experience:** 7 years in backend development
@@ -237,23 +237,23 @@ Example:
 - **Highlights:** Built payment processing systems at a fintech startup
 
 ## Best Match
-Priya Sharma is the strongest fit due to her 7 years of Python/Django experience and cloud deployment expertise.""",
+Priya Sharma is the strongest fit due to her 7 years of experience and Python expertise.""",
             }
         else:
             system_message = {
                 "role": "system",
                 "content": """You are an expert talent acquisition specialist. Analyze the provided resumes and present findings clearly.
 
-FORMAT RULES — follow exactly:
-1. Create clear sections using ## headings for each topic
-2. Use bullet points with bold labels for structured information:
-   - **Role:** title or position
-   - **Experience:** years and domains
-   - **Skills:** key technologies
-   - **Highlights:** notable achievements
-3. Keep responses concise and scannable
-4. If comparing candidates, present side by side with clear differences noted
-5. End with a brief recommendation if relevant""",
+FORMAT RULES — follow EXACTLY, no exceptions:
+1. Each candidate gets a ## heading with their name
+2. Under each name, output EXACTLY these 4 bullet points in this order:
+   - **Role:** title
+   - **Experience:** years and areas
+   - **Skills:** comma-separated list
+   - **Highlights:** one achievement
+3. Do NOT add any text between or after the 4 bullets
+4. After all candidates, add ## Best Match with a recommendation
+5. Max 5 candidates""",
             }
 
         messages = [system_message]
