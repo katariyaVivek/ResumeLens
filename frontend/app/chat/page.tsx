@@ -151,9 +151,14 @@ function parseCandidates(text: string): Candidate[] | null {
     }
 
     const extract = (label: string) => {
-      const re = new RegExp(`\\*\\*${label}:?\\*\\*\\s*(.+?)(?=\\n-|\\n\\*|\\n\\n|$)`, "si");
-      const m = section.match(re);
-      return m ? m[1].trim().replace(/^["']|["']$/g, "") : "";
+      const patterns: Record<string, RegExp> = {
+        Role: /-\s+\*\*Role:?\*\*\s*(.+?)(?=\n)/si,
+        Experience: /-\s+\*\*Experience:?\*\*\s*(.+?)(?=\n)/si,
+        Skills: /-\s+\*\*Skills:?\*\*\s*(.+?)(?=\n)/si,
+        Highlights: /-\s+\*\*Highlights:?\*\*\s*(.+?)(?=\n)/si,
+      };
+      const m = section.match(patterns[label]);
+      return m ? m[1].trim().replace(/^["']|[""]$/g, "") : "";
     };
 
     const role = extract("Role");
