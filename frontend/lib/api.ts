@@ -101,14 +101,10 @@ export async function ingestDocuments(payload: IngestRequest): Promise<IngestRes
 }
 
 export async function ingestFile(
-  file: File,
-  contentColumn: string,
-  idColumn: string
+  file: File
 ): Promise<IngestResponse> {
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("content_column", contentColumn);
-  formData.append("id_column", idColumn);
 
   const supabaseModule = await import("@/lib/supabase");
   const { data: { session } } = await supabaseModule.supabase.auth.getSession();

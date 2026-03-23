@@ -194,8 +194,6 @@ interface UploadModalProps {
 function UploadModal({ onClose, onSuccess }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState("");
-  const [contentColumn, setContentColumn] = useState("content");
-  const [idColumn, setIdColumn] = useState("id");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [mode, setMode] = useState<"url" | "file">("url");
@@ -234,8 +232,8 @@ function UploadModal({ onClose, onSuccess }: UploadModalProps) {
         }
         const res = await ingestDocuments({
           file_url: fileUrl.trim(),
-          content_column: contentColumn.trim(),
-          id_column: idColumn.trim(),
+          content_column: "content",
+          id_column: "id",
         });
         onSuccess(res.message);
       } else {
@@ -245,7 +243,7 @@ function UploadModal({ onClose, onSuccess }: UploadModalProps) {
           return;
         }
         const { ingestFile } = await import("@/lib/api");
-        const res = await ingestFile(file, contentColumn.trim(), idColumn.trim());
+        const res = await ingestFile(file);
         onSuccess(res.message);
       }
     } catch (err: unknown) {
@@ -294,7 +292,7 @@ function UploadModal({ onClose, onSuccess }: UploadModalProps) {
           </div>
         ) : (
           <div>
-            <label className="modal-label">CSV File</label>
+            <label className="modal-label">Resume File</label>
             <div
               className={`upload-zone ${dragActive ? "active" : ""}`}
               onDragEnter={handleDrag}
@@ -305,7 +303,7 @@ function UploadModal({ onClose, onSuccess }: UploadModalProps) {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv"
+                accept=".csv,.pdf,.txt"
                 className="upload-input"
                 onChange={handleFileSelect}
               />
@@ -314,36 +312,13 @@ function UploadModal({ onClose, onSuccess }: UploadModalProps) {
                 <p className="text-sm text-[#9b6b82] font-medium pointer-events-none">{file.name}</p>
               ) : (
                 <>
-                  <p className="text-sm text-[#3e2f45]/50 pointer-events-none">Drop CSV here or click to browse</p>
-                  <p className="text-xs text-[#cbbfc8] mt-1 pointer-events-none">Supports .csv files</p>
+                  <p className="text-sm text-[#3e2f45]/50 pointer-events-none">Drop file here or click to browse</p>
+                  <p className="text-xs text-[#cbbfc8] mt-1 pointer-events-none">Supports .csv, .pdf, .txt files</p>
                 </>
               )}
             </div>
           </div>
         )}
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="modal-label">Content Column</label>
-            <input
-              type="text"
-              className="modal-input"
-              placeholder="content"
-              value={contentColumn}
-              onChange={(e) => setContentColumn(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="modal-label">ID Column</label>
-            <input
-              type="text"
-              className="modal-input"
-              placeholder="id"
-              value={idColumn}
-              onChange={(e) => setIdColumn(e.target.value)}
-            />
-          </div>
-        </div>
 
         {error && (
           <p className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">{error}</p>
