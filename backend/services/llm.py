@@ -134,9 +134,12 @@ FORMAT RULES — follow EXACTLY, no exceptions:
    - **Experience:** years and areas
    - **Skills:** comma-separated list (e.g. Python, Django, AWS)
    - **Highlights:** one achievement
-3. Do NOT add any text between or after the 4 bullets
-4. After all candidates, add ## Best Match with a 2-3 sentence recommendation
-5. Max 5 candidates
+3. Put every heading and every bullet on its own line
+4. Put one blank line between candidates
+5. Do NOT put headings, bullets, or the Best Match paragraph on the same line
+6. Do NOT add any text between or after the 4 bullets
+7. After all candidates, add ## Best Match with a 2-3 sentence recommendation
+8. Max 5 candidates
 
 STRICT EXAMPLE — copy this format exactly:
 ## Priya Sharma
@@ -160,9 +163,12 @@ FORMAT RULES — follow EXACTLY, no exceptions:
    - **Experience:** years and areas
    - **Skills:** comma-separated list
    - **Highlights:** one achievement
-3. Do NOT add any text between or after the 4 bullets
-4. After all candidates, add ## Best Match with a recommendation
-5. Max 5 candidates""",
+3. Put every heading and every bullet on its own line
+4. Put one blank line between candidates
+5. Do NOT put headings, bullets, or the Best Match paragraph on the same line
+6. Do NOT add any text between or after the 4 bullets
+7. After all candidates, add ## Best Match with a recommendation
+8. Max 5 candidates""",
             }
 
         messages = [system_message]
@@ -225,9 +231,12 @@ FORMAT RULES — follow EXACTLY, no exceptions:
    - **Experience:** years and areas
    - **Skills:** comma-separated list (e.g. Python, Django, AWS)
    - **Highlights:** one achievement
-3. Do NOT add any text between or after the 4 bullets
-4. After all candidates, add ## Best Match with a 2-3 sentence recommendation
-5. Max 5 candidates
+3. Put every heading and every bullet on its own line
+4. Put one blank line between candidates
+5. Do NOT put headings, bullets, or the Best Match paragraph on the same line
+6. Do NOT add any text between or after the 4 bullets
+7. After all candidates, add ## Best Match with a 2-3 sentence recommendation
+8. Max 5 candidates
 
 STRICT EXAMPLE — copy this format exactly:
 ## Priya Sharma
@@ -251,9 +260,12 @@ FORMAT RULES — follow EXACTLY, no exceptions:
    - **Experience:** years and areas
    - **Skills:** comma-separated list
    - **Highlights:** one achievement
-3. Do NOT add any text between or after the 4 bullets
-4. After all candidates, add ## Best Match with a recommendation
-5. Max 5 candidates""",
+3. Put every heading and every bullet on its own line
+4. Put one blank line between candidates
+5. Do NOT put headings, bullets, or the Best Match paragraph on the same line
+6. Do NOT add any text between or after the 4 bullets
+7. After all candidates, add ## Best Match with a recommendation
+8. Max 5 candidates""",
             }
 
         messages = [system_message]

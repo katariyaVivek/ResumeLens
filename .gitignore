@@ -8,6 +8,7 @@ venv/
 # Node
 node_modules/
 .next/
+*.tsbuildinfo
 
 # Next.js
 next-env.d.ts
@@ -21,6 +22,7 @@ frontend/.env.local
 
 # Misc
 .DS_Store
+.playwright-mcp/
 .ruff_cache/
 nul
 design/
