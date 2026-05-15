@@ -174,3 +174,22 @@
 
 ### Open questions / blockers
 - Need to push the CI-fix commit to `codex/polish-resumelens-ui` so GitHub Actions reruns on PR #1.
+
+## 2026-05-15
+
+### Attempted
+- Investigated the failing `Frontend CI/CD / deploy (push)` check after PR #1 was merged to `main`.
+- Confirmed Vercel's GitHub integration completed the deployment successfully while the separate GitHub Actions deploy job failed.
+- Removed the duplicate frontend GitHub Actions deploy job that required missing `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID` secrets.
+
+### Failed (most valuable -- include why)
+- The previous frontend deploy action failed with `Input required and not supplied: vercel-token` because those Vercel secrets are not configured in GitHub Actions.
+
+### Worked
+- Frontend lint/build and backend lint/typecheck/deploy checks were already passing on the merge commit.
+
+### New rules added to AGENTS.md
+- None.
+
+### Open questions / blockers
+- Need to push the frontend workflow cleanup to `main` so GitHub Actions reruns without the duplicate deploy job.
