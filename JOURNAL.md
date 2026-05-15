@@ -193,3 +193,23 @@
 
 ### Open questions / blockers
 - Need to push the frontend workflow cleanup to `main` so GitHub Actions reruns without the duplicate deploy job.
+
+## 2026-05-15
+
+### Attempted
+- Pushed `8fb3c93 Remove duplicate Vercel deploy action` to `main` after explicit confirmation.
+- Watched the new `Frontend CI/CD` push run for the cleanup commit.
+
+### Failed (most valuable -- include why)
+- None.
+
+### Worked
+- `git push origin main` succeeded.
+- The new frontend workflow run passed with only lint and build jobs.
+- The old failing duplicate Vercel deploy action is no longer part of the frontend workflow.
+
+### New rules added to AGENTS.md
+- None.
+
+### Open questions / blockers
+- None.
