@@ -42,3 +42,4 @@ class ModelsRequest(BaseModel):
 
 class ModelsResponse(BaseModel):
     models: List[str]
+    error: Optional[str] = None

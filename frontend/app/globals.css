@@ -7,17 +7,26 @@
     --sidebar-width: 280px;
     --header-height: 60px;
     --input-height: 80px;
-    --bg-primary: #f9f5fc;
-    --bg-lavender: #e8dff0;
-    --bg-pink: #f2d9e3;
-    --border-mauve: #cbbfc8;
-    --accent-rose: #9b6b82;
-    --text-dark: #3e2f45;
+    --color-paper: 250 246 238;
+    --color-canvas: 242 235 222;
+    --color-panel: 255 252 246;
+    --color-ink: 54 44 35;
+    --color-muted: 119 103 84;
+    --color-line: 220 207 188;
+    --color-pine: 101 121 88;
+    --color-pine-dark: 73 92 66;
+    --color-brass: 188 128 79;
+    --color-rust: 153 88 62;
+    --color-sky: 83 116 100;
+  }
+
+  html {
+    background: rgb(var(--color-paper));
   }
 
   * {
     scrollbar-width: thin;
-    scrollbar-color: #cbbfc8 transparent;
+    scrollbar-color: rgb(var(--color-line)) transparent;
   }
 
   *::-webkit-scrollbar {
@@ -30,109 +39,147 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background-color: #cbbfc8;
+    background-color: rgb(var(--color-line));
     border-radius: 9999px;
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background-color: #9b6b82;
+    background-color: rgb(var(--color-pine));
+  }
+
+  button,
+  input,
+  textarea {
+    font: inherit;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid rgb(var(--color-brass));
+    outline-offset: 2px;
   }
 }
 
 @layer components {
+  .workspace-surface {
+    background:
+      radial-gradient(circle at 18% 14%, rgb(var(--color-brass) / 0.09), transparent 27%),
+      radial-gradient(circle at 88% 22%, rgb(var(--color-pine) / 0.10), transparent 24%),
+      linear-gradient(rgb(var(--color-line) / 0.22) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--color-line) / 0.18) 1px, transparent 1px),
+      rgb(var(--color-paper));
+    background-size: 44px 44px;
+  }
+
   .function-card {
-    @apply flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all duration-150;
-    @apply bg-white/5 hover:bg-[#e8dff0]/25 border border-transparent hover:border-[#cbbfc8]/40;
+    @apply flex items-start gap-3 rounded-lg border border-transparent p-3 text-left transition-all duration-150;
+    @apply bg-white/5 hover:bg-white/10 hover:border-white/15;
   }
 
   .function-card.active {
-    @apply bg-[#f2d9e3]/30 border-[#9b6b82]/40;
+    @apply border-brass/50 bg-brass/15;
   }
 
   .msg-bubble {
-    @apply max-w-[75%] px-4 py-3 rounded-2xl leading-relaxed;
+    @apply max-w-[90%] rounded-lg px-4 py-3 leading-relaxed shadow-soft-line sm:max-w-[82%];
   }
 
   .msg-bubble-user {
-    @apply bg-[#f2d9e3] text-[#3e2f45] rounded-br-md;
+    @apply rounded-br-sm bg-pine text-white;
   }
 
   .msg-bubble-assistant {
-    @apply bg-[#e8dff0] text-[#3e2f45] rounded-bl-md;
+    @apply rounded-bl-sm border border-line/70 bg-panel text-ink;
   }
 
   .input-glow:focus-within {
-    box-shadow: 0 0 0 2px rgba(155, 107, 130, 0.3);
+    box-shadow: 0 0 0 3px rgb(var(--color-pine) / 0.20), 0 18px 42px rgb(var(--color-ink) / 0.08);
   }
 
   .modal-backdrop {
-    @apply fixed inset-0 bg-[#2d2438]/50 z-50 flex items-center justify-center p-4;
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-ink/55 p-4 backdrop-blur-sm;
   }
 
   .modal-content {
-    @apply bg-[#f9f5fc] rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4;
+    @apply w-full max-w-md space-y-4 rounded-lg border border-line bg-panel p-6 shadow-panel;
   }
 
   .modal-title {
-    @apply text-lg font-semibold text-[#3e2f45];
+    @apply font-display text-lg font-semibold text-ink;
   }
 
   .modal-input {
-    @apply w-full px-3 py-2.5 rounded-xl border border-[#cbbfc8] bg-[#e8dff0]/30
-           text-sm text-[#3e2f45] placeholder:text-[#9b6b82]
-           focus:outline-none focus:border-[#9b6b82] focus:bg-white
+    @apply w-full rounded-lg border border-line bg-canvas/60 px-3 py-2.5
+           text-sm text-ink placeholder:text-muted
+           focus:border-pine focus:bg-panel focus:outline-none
            transition-colors;
   }
 
   .modal-label {
-    @apply block text-xs font-medium text-[#3e2f45]/60 mb-1.5;
+    @apply mb-1.5 block text-xs font-medium text-muted;
   }
 
   .modal-btn-primary {
-    @apply w-full py-2.5 rounded-xl bg-[#9b6b82] hover:bg-[#875a70]
+    @apply w-full rounded-lg bg-pine px-3 py-2.5 hover:bg-pine-dark
            text-white text-sm font-medium transition-colors
            disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .modal-btn-secondary {
-    @apply w-full py-2.5 rounded-xl border border-[#cbbfc8]
-           text-[#3e2f45] text-sm font-medium hover:bg-[#e8dff0]/40 transition-colors;
+    @apply w-full rounded-lg border border-line px-3 py-2.5
+           text-sm font-medium text-ink transition-colors hover:bg-canvas;
   }
 
   .rag-toggle {
-    @apply flex rounded-xl border border-[#cbbfc8] overflow-hidden text-xs;
+    @apply flex overflow-hidden rounded-lg border border-line bg-panel text-xs shadow-soft-line;
   }
 
   .rag-toggle-btn {
-    @apply px-3 py-1.5 font-medium transition-colors cursor-pointer;
+    @apply cursor-pointer px-3 py-1.5 font-medium transition-colors;
   }
 
   .rag-toggle-btn.active {
-    @apply bg-[#9b6b82] text-white;
+    @apply bg-ink text-white;
   }
 
   .rag-toggle-btn:not(.active) {
-    @apply text-[#3e2f45]/50 hover:bg-[#e8dff0]/50;
+    @apply text-muted hover:bg-canvas hover:text-ink;
   }
 
   .copy-btn {
-    @apply opacity-0 group-hover:opacity-100 p-1.5 rounded-lg
-           hover:bg-[#cbbfc8]/40 transition-all cursor-pointer text-[#9b6b82]
-           hover:text-[#3e2f45];
+    @apply cursor-pointer rounded-md p-1.5 text-muted opacity-0 transition-all
+           hover:bg-canvas hover:text-ink group-hover:opacity-100;
   }
 
   .upload-zone {
-    @apply relative border-2 border-dashed border-[#cbbfc8] rounded-xl p-6
-           text-center cursor-pointer hover:border-[#9b6b82]
-           hover:bg-[#e8dff0]/30 transition-all;
+    @apply relative cursor-pointer rounded-lg border-2 border-dashed border-line p-6
+           text-center transition-all hover:border-pine hover:bg-canvas;
   }
 
   .upload-zone.active {
-    @apply border-[#9b6b82] bg-[#f2d9e3]/25;
+    @apply border-pine bg-pine/10;
   }
 
   .upload-input {
     @apply absolute inset-0 w-full h-full cursor-pointer;
     opacity: 0;
+  }
+
+  .settings-input {
+    @apply w-full rounded-lg border border-line bg-canvas/70 px-3 py-2 text-xs text-ink
+           placeholder:text-muted focus:border-pine focus:bg-panel focus:outline-none;
+  }
+
+  .typing-dot {
+    @apply h-1.5 w-1.5 rounded-full bg-pine animate-typing-pulse;
+  }
+
+  .typing-dot:nth-child(2) {
+    animation-delay: 140ms;
+  }
+
+  .typing-dot:nth-child(3) {
+    animation-delay: 280ms;
   }
 }

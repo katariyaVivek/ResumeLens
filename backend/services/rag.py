@@ -8,7 +8,6 @@ from typing import List, Dict, Any, Optional
 from backend.services.vector_store import VectorStoreService
 from backend.services.embeddings import EmbeddingsService
 from backend.services.llm import LLMService
-from backend.models.chat import RAGMode
 
 logger = logging.getLogger(__name__)
 

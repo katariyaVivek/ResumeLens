@@ -2,10 +2,12 @@ import sys
 
 sys.dont_write_bytecode = True
 
+import json
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+import httpx
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -16,13 +18,11 @@ from backend.models.chat import (
     ModelsRequest,
     ModelsResponse,
 )
-from backend.models.user import User
 from backend.services.rag import RAGService
 from backend.services.rag_fusion import RAGFusionService
 from backend.services.vector_store import VectorStoreService
 from backend.services.embeddings import EmbeddingsService
 from backend.services.llm import LLMService
-from backend.routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,21 @@ router = APIRouter()
 
 vector_store = VectorStoreService()
 embeddings = EmbeddingsService()
+
+NON_CHAT_MODEL_PATTERNS = (
+    "whisper",
+    "tts",
+    "stt",
+    "embed",
+    "embedding",
+    "rerank",
+    "prompt-guard",
+    "guard",
+    "moderation",
+    "dall-e",
+    "stable-diffusion",
+    "orpheus",
+)
 
 
 class StreamChatRequest(BaseModel):
@@ -63,6 +78,37 @@ def _build_llm(
         provider=request_provider,
         api_base=request_api_base,
     )
+
+
+def _normalize_models_base_url(api_base: str) -> str:
+    cleaned = api_base.strip().rstrip("/")
+
+    if not cleaned:
+        return cleaned
+
+    if not cleaned.startswith(("http://", "https://")):
+        cleaned = f"https://{cleaned}"
+
+    if cleaned == "https://api.groq.com":
+        return "https://api.groq.com/openai/v1"
+
+    return cleaned
+
+
+def _extract_error_message(response: httpx.Response) -> str:
+    try:
+        payload = response.json()
+    except ValueError:
+        return f"Model fetch failed with status {response.status_code}."
+
+    if isinstance(payload, dict):
+        error = payload.get("error")
+        if isinstance(error, dict) and isinstance(error.get("message"), str):
+            return error["message"]
+        if isinstance(payload.get("detail"), str):
+            return payload["detail"]
+
+    return f"Model fetch failed with status {response.status_code}."
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -159,7 +205,6 @@ async def stream_chat(
             documents = []
 
         async def generate():
-            full_response = ""
             try:
                 async for chunk in llm.generate_response_stream(
                     query=request.message,
@@ -167,12 +212,11 @@ async def stream_chat(
                     query_type=query_type,
                     chat_history=chat_history,
                 ):
-                    full_response += chunk
-                    yield f"data: {chunk}\n\n"
+                    yield f"data: {json.dumps(chunk)}\n\n"
             except Exception as e:
                 logger.error(f"Streaming error: {e}")
-                yield f"data: Error: {str(e)}\n\n"
-            yield f"data: [DONE]\n\n"
+                yield f"data: {json.dumps(f'Error: {str(e)}')}\n\n"
+            yield "data: [DONE]\n\n"
 
         return StreamingResponse(
             generate(),
@@ -186,38 +230,51 @@ async def stream_chat(
 @router.post("/models", response_model=ModelsResponse)
 async def list_models(request: ModelsRequest):
     """Fetch available chat models from an OpenAI-compatible API."""
-    import httpx as _httpx
-
-    NON_CHAT_PATTERNS = (
-        "whisper",
-        "tts",
-        "stt",
-        "embed",
-        "rerank",
-        "prompt-guard",
-        "guard",
-        "moderation",
-        "vision",
-        "dall-e",
-        "stable-diffusion",
-    )
+    api_base = _normalize_models_base_url(request.api_base)
 
     try:
-        async with _httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.get(
-                f"{request.api_base.rstrip('/')}/models",
-                headers={"Authorization": f"Bearer {request.api_key}"},
+                f"{api_base}/models",
+                headers={
+                    "Authorization": f"Bearer {request.api_key}",
+                    "Content-Type": "application/json",
+                },
             )
-            response.raise_for_status()
+
+            if response.status_code >= 400:
+                return ModelsResponse(
+                    models=[],
+                    error=_extract_error_message(response),
+                )
+
             data = response.json()
-            all_models = [m["id"] for m in data.get("data", [])]
+            all_models = [
+                model["id"]
+                for model in data.get("data", [])
+                if isinstance(model, dict) and isinstance(model.get("id"), str)
+            ]
             models = [
-                m
-                for m in all_models
-                if not any(p in m.lower() for p in NON_CHAT_PATTERNS)
+                model
+                for model in all_models
+                if not any(
+                    pattern in model.lower() for pattern in NON_CHAT_MODEL_PATTERNS
+                )
             ]
             models.sort()
             return ModelsResponse(models=models)
-    except Exception as e:
-        logger.error(f"Failed to fetch models: {e}")
-        return ModelsResponse(models=[])
+    except httpx.TimeoutException:
+        logger.warning("Model fetch timed out for base URL: %s", api_base)
+        return ModelsResponse(models=[], error="Model fetch timed out.")
+    except httpx.RequestError as e:
+        logger.warning("Model fetch request failed for base URL %s: %s", api_base, e)
+        return ModelsResponse(
+            models=[],
+            error="Backend could not reach the model provider.",
+        )
+    except ValueError:
+        logger.exception("Model provider returned invalid JSON")
+        return ModelsResponse(
+            models=[],
+            error="Model provider returned an unreadable response.",
+        )

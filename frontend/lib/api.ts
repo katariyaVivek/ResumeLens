@@ -1,36 +1,67 @@
-import { ChatRequest, ChatResponse, IngestRequest, IngestResponse, User, Message } from "@/types";
+import type { ChatRequest, ChatResponse, IngestRequest, IngestResponse, ModelFetchResult, User } from "@/types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function authHeaders(): Promise<HeadersInit> {
-  const { data: { session } } = await import("@/lib/supabase").then(m => m.supabase.auth.getSession());
-  
+  const { data: { session } } = await import("@/lib/supabase").then((m) => m.supabase.auth.getSession());
+
   if (session?.access_token) {
     return {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${session.access_token}`,
     };
   }
-  
+
   return {
     "Content-Type": "application/json",
   };
 }
 
+async function getErrorMessage(res: Response, fallback: string): Promise<string> {
+  const error = await res.json().catch(() => ({}));
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "detail" in error &&
+    typeof error.detail === "string"
+  ) {
+    return error.detail;
+  }
+
+  return fallback;
+}
+
+function decodeStreamPayload(data: string): string {
+  try {
+    const parsed: unknown = JSON.parse(data);
+    return typeof parsed === "string" ? parsed : data;
+  } catch {
+    return data;
+  }
+}
+
+function getServerSentEventData(event: string): string {
+  return event
+    .split("\n")
+    .filter((line) => line.startsWith("data: "))
+    .map((line) => line.slice(6))
+    .join("\n");
+}
+
 export async function sendChatMessage(payload: ChatRequest): Promise<ChatResponse> {
   const headers = await authHeaders();
-  
+
   const res = await fetch(`${BASE_URL}/api/chat`, {
     method: "POST",
     headers,
     body: JSON.stringify(payload),
   });
-  
+
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.detail || `Chat failed: ${res.status}`);
+    throw new Error(await getErrorMessage(res, `Chat failed: ${res.status}`));
   }
-  
+
   return res.json();
 }
 
@@ -49,12 +80,12 @@ export async function streamChatMessage(
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.detail || `Chat failed: ${res.status}`);
+    throw new Error(await getErrorMessage(res, `Chat failed: ${res.status}`));
   }
 
   const reader = res.body?.getReader();
   const decoder = new TextDecoder();
+  let buffer = "";
 
   if (!reader) {
     throw new Error("No response body");
@@ -68,35 +99,43 @@ export async function streamChatMessage(
 
     const { done, value } = await reader.read();
 
-    if (done) break;
-
-    const chunk = decoder.decode(value);
-    const lines = chunk.split("\n");
-
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const data = line.slice(6);
-        if (data === "[DONE]") return;
-        onChunk(data);
-      }
+    if (done) {
+      buffer += decoder.decode();
+      break;
     }
+
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split("\n\n");
+    buffer = events.pop() ?? "";
+
+    for (const event of events) {
+      const data = getServerSentEventData(event);
+
+      if (!data) continue;
+      if (data === "[DONE]") return;
+      onChunk(decodeStreamPayload(data));
+    }
+  }
+
+  const data = getServerSentEventData(buffer);
+  if (data && data !== "[DONE]") {
+    onChunk(decodeStreamPayload(data));
   }
 }
 
 export async function ingestDocuments(payload: IngestRequest): Promise<IngestResponse> {
   const headers = await authHeaders();
-  
+
   const res = await fetch(`${BASE_URL}/api/ingest`, {
     method: "POST",
     headers,
     body: JSON.stringify(payload),
   });
-  
+
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.detail || `Ingest failed: ${res.status}`);
+    throw new Error(await getErrorMessage(res, `Ingest failed: ${res.status}`));
   }
-  
+
   return res.json();
 }
 
@@ -121,8 +160,7 @@ export async function ingestFile(
   });
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.detail || `Upload failed: ${res.status}`);
+    throw new Error(await getErrorMessage(res, `Upload failed: ${res.status}`));
   }
 
   return res.json();
@@ -130,15 +168,15 @@ export async function ingestFile(
 
 export async function getCurrentUser(): Promise<User> {
   const headers = await authHeaders();
-  
+
   const res = await fetch(`${BASE_URL}/api/auth/me`, {
     headers,
   });
-  
+
   if (!res.ok) {
     throw new Error(`Failed to get user: ${res.status}`);
   }
-  
+
   return res.json();
 }
 
@@ -148,7 +186,21 @@ export async function wakeUp(): Promise<void> {
   } catch {}
 }
 
-export async function fetchModels(apiKey: string, apiBase: string): Promise<string[]> {
+function normalizeApiBase(apiBase: string): string {
+  const trimmed = apiBase.trim().replace(/\/+$/, "");
+
+  if (!trimmed) return trimmed;
+
+  const withScheme = /^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  if (withScheme === "https://api.groq.com") {
+    return "https://api.groq.com/openai/v1";
+  }
+
+  return withScheme;
+}
+
+export async function fetchModels(apiKey: string, apiBase: string): Promise<ModelFetchResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 45000);
 
@@ -156,16 +208,31 @@ export async function fetchModels(apiKey: string, apiBase: string): Promise<stri
     const res = await fetch(`${BASE_URL}/api/models`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ api_key: apiKey, api_base: apiBase }),
+      body: JSON.stringify({
+        api_key: apiKey,
+        api_base: normalizeApiBase(apiBase),
+      }),
       signal: controller.signal,
     });
 
     clearTimeout(timer);
-    if (!res.ok) return [];
+    if (!res.ok) {
+      return {
+        models: [],
+        error: await getErrorMessage(res, `Model fetch failed: ${res.status}`),
+      };
+    }
+
     const data = await res.json();
-    return data.models ?? [];
+    return {
+      models: Array.isArray(data.models) ? data.models : [],
+      error: typeof data.error === "string" ? data.error : undefined,
+    };
   } catch {
     clearTimeout(timer);
-    return [];
+    return {
+      models: [],
+      error: "Backend is unavailable. Start the backend on port 8000.",
+    };
   }
 }

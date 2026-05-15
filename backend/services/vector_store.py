@@ -4,8 +4,8 @@ sys.dont_write_bytecode = True
 
 import logging
 import os
-from typing import List, Dict, Any, Optional
-from pathlib import Path
+from typing import List, Dict, Any, Optional, Union
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +50,8 @@ class VectorStoreService:
                 self._index = self.client.Index(self.index_name)
             elif self.provider == "qdrant":
                 self._index = self.client
+            else:
+                raise ValueError(f"Unsupported vector store provider: {self.provider}")
         return self._index
 
     async def similarity_search(
@@ -92,6 +94,7 @@ class VectorStoreService:
         except Exception as e:
             logger.error(f"Similarity search failed: {e}")
             return []
+        return []
 
     async def similarity_search_with_score(
         self,
@@ -127,17 +130,17 @@ class VectorStoreService:
                     start_idx = batch_num * batch_size
                     end_idx = min(start_idx + batch_size, len(ids))
 
-                    vectors = [
-                        {
-                            "id": ids[i],
-                            "values": embeddings[i],
-                            "metadata": {
-                                **metadata[i],
-                                "document": documents[i],
-                            },
-                        }
-                        for i in range(start_idx, end_idx)
-                    ]
+                    vectors = []
+                    for i in range(start_idx, end_idx):
+                        metadata_payload = dict(metadata[i])
+                        metadata_payload["document"] = documents[i]
+                        vectors.append(
+                            {
+                                "id": ids[i],
+                                "values": embeddings[i],
+                                "metadata": metadata_payload,
+                            }
+                        )
 
                     self.index.upsert(vectors=vectors)
                     logger.info(f"Upserted batch {batch_num + 1}/{total_batches}")
@@ -151,10 +154,7 @@ class VectorStoreService:
                     PointStruct(
                         id=ids[i],
                         vector=embeddings[i],
-                        payload={
-                            **metadata[i],
-                            "document": documents[i],
-                        },
+                        payload=dict(metadata[i], document=documents[i]),
                     )
                     for i in range(len(ids))
                 ]
@@ -174,11 +174,12 @@ class VectorStoreService:
                 self.index.delete(ids=ids)
                 return True
             elif self.provider == "qdrant":
-                from qdrant_client.models import Filter
+                from qdrant_client.models import PointIdsList
 
+                point_ids: List[Union[int, str, UUID]] = [point_id for point_id in ids]
                 self.index.delete(
                     collection_name=self.index_name,
-                    points_selector=Filter(must=[{"id": {"in": ids}}]),
+                    points_selector=PointIdsList(points=point_ids),
                 )
                 return True
         except Exception as e:
@@ -198,8 +199,6 @@ class VectorStoreService:
                     for vec_id, vec_data in results.get("vectors", {}).items()
                 ]
             elif self.provider == "qdrant":
-                from qdrant_client.models import Filter
-
                 results = self.index.retrieve(
                     collection_name=self.index_name,
                     ids=ids,
@@ -214,3 +213,4 @@ class VectorStoreService:
         except Exception as e:
             logger.error(f"Get by ID failed: {e}")
             return []
+        return []

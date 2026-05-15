@@ -1,6 +1,7 @@
 export interface Message {
   role: "user" | "assistant" | "system";
   content: string;
+  createdAt?: string;
 }
 
 export type RAGMode = "Generic RAG" | "RAG Fusion";
@@ -33,6 +34,11 @@ export interface IngestResponse {
   document_count: number;
   message: string;
   document_ids?: string[];
+}
+
+export interface ModelFetchResult {
+  models: string[];
+  error?: string;
 }
 
 export interface User {
