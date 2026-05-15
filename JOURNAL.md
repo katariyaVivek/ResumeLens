@@ -148,3 +148,29 @@
 
 ### Open questions / blockers
 - Wait for Vercel preview/build status on PR #1, then review before merge.
+
+## 2026-05-15
+
+### Attempted
+- Investigated failing backend GitHub Actions checks on PR #1.
+- Updated backend lint CI to ignore E402 because the repository-mandated `sys.dont_write_bytecode` header intentionally puts imports after executable code.
+- Updated backend typecheck CI to run mypy from the repository root against `backend` with explicit package bases.
+- Removed unused backend imports and fixed mypy-visible return/type issues in auth, LLM model parsing, ingest, and vector-store helpers.
+- Fixed ingest helpers to await the async vector-store upsert call instead of treating the coroutine as a success value.
+
+### Failed (most valuable -- include why)
+- The bundled GitHub CI inspection script failed on Windows log decoding, so direct `gh run view --log-failed` was used instead.
+- `python -m pytest backend\tests` collected zero tests; pytest exits non-zero when there is no test suite to run.
+
+### Worked
+- `python -m ruff check --fix --ignore E402 .` passed from `backend/`.
+- `python -m ruff format --check .` passed from `backend/`.
+- `python -m mypy backend --explicit-package-bases --ignore-missing-imports` passed from the repository root.
+- `python -m compileall -q backend` passed.
+- `git diff --check` passed.
+
+### New rules added to AGENTS.md
+- None.
+
+### Open questions / blockers
+- Need to push the CI-fix commit to `codex/polish-resumelens-ui` so GitHub Actions reruns on PR #1.

@@ -6,14 +6,12 @@ import logging
 import io
 
 import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from backend.models.ingest import IngestRequest, IngestResponse
-from backend.models.user import User
 from backend.services.vector_store import VectorStoreService
 from backend.services.embeddings import EmbeddingsService
-from backend.routers.auth import get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +112,9 @@ def _parse_txt(content: bytes) -> list[tuple[str, str]]:
     return [("1", text)]
 
 
-def _ingest_documents(pairs: list[tuple[str, str]], source: str) -> IngestResponse:
+async def _ingest_documents(
+    pairs: list[tuple[str, str]], source: str
+) -> IngestResponse:
     """Chunk, embed, and upsert documents to vector store."""
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1024,
@@ -142,7 +142,7 @@ def _ingest_documents(pairs: list[tuple[str, str]], source: str) -> IngestRespon
 
     embeddings_list = embeddings.embed_documents(all_chunks)
 
-    success = vector_store.upsert(
+    success = await vector_store.upsert(
         ids=all_ids,
         embeddings=embeddings_list,
         documents=all_chunks,
@@ -206,7 +206,7 @@ async def ingest(
         ids = df[request.id_column].astype(str).tolist()
 
         pairs = list(zip(ids, documents))
-        return _ingest_documents(pairs, request.file_url.split("/")[-1])
+        return await _ingest_documents(pairs, request.file_url.split("/")[-1])
 
     except Exception as e:
         logger.exception("Ingest failed")
@@ -225,7 +225,7 @@ async def ingest_upload(
         content = await file.read()
         filename = file.filename or "upload"
         pairs = _parse_file(filename, content)
-        return _ingest_documents(pairs, filename)
+        return await _ingest_documents(pairs, filename)
 
     except HTTPException:
         raise

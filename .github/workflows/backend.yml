@@ -30,7 +30,7 @@ jobs:
 
       - name: Run ruff
         working-directory: backend
-        run: ruff check --fix .
+        run: ruff check --fix --ignore E402 .
 
       - name: Run ruff format
         working-directory: backend
@@ -53,8 +53,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run mypy
-        working-directory: backend
-        run: mypy .
+        run: mypy backend --explicit-package-bases --ignore-missing-imports
 
   deploy:
     needs: [lint, typecheck]

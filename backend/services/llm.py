@@ -32,7 +32,7 @@ API_KEY_ENV_MAP = {
 def _parse_model(model: str, api_base: Optional[str]) -> tuple[str, str, str]:
     if "/" in model:
         provider, _, _ = model.partition("/")
-        base = api_base or API_BASE_MAP.get(provider, "")
+        base = api_base or API_BASE_MAP.get(provider) or ""
         return model, base, provider
     return model, api_base or "", ""
 

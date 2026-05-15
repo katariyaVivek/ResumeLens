@@ -6,7 +6,7 @@ import logging
 import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import jwt
 from jwt import PyJWKClient
@@ -54,8 +54,14 @@ async def get_current_user(
             )
 
         user_id = payload.get("sub")
-        email = payload.get("email", "")
-        role = payload.get("role", "user")
+        email_value = payload.get("email", "")
+        role_value = payload.get("role", "user")
+
+        if not isinstance(user_id, str) or not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        email = email_value if isinstance(email_value, str) else ""
+        role = role_value if isinstance(role_value, str) else "user"
 
         return User(
             id=user_id,

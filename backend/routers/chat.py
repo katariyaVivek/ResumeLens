@@ -258,8 +258,7 @@ async def list_models(request: ModelsRequest):
                 model
                 for model in all_models
                 if not any(
-                    pattern in model.lower()
-                    for pattern in NON_CHAT_MODEL_PATTERNS
+                    pattern in model.lower() for pattern in NON_CHAT_MODEL_PATTERNS
                 )
             ]
             models.sort()
