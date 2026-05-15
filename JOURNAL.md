@@ -129,3 +129,22 @@
 
 ### Open questions / blockers
 - Need confirmation before pushing `codex/polish-resumelens-ui` to GitHub and opening the Vercel preview PR.
+
+## 2026-05-15
+
+### Attempted
+- Pushed release branch `codex/polish-resumelens-ui` to GitHub after explicit confirmation.
+- Created a draft PR against `main` for Vercel preview deployment.
+
+### Failed (most valuable -- include why)
+- None.
+
+### Worked
+- `git push -u origin codex/polish-resumelens-ui` succeeded.
+- Draft PR was created at `https://github.com/katariyaVivek/ResumeLens/pull/1`.
+
+### New rules added to AGENTS.md
+- None.
+
+### Open questions / blockers
+- Wait for Vercel preview/build status on PR #1, then review before merge.
