@@ -213,3 +213,27 @@
 
 ### Open questions / blockers
 - None.
+
+## 2026-06-04
+
+### Attempted
+- Investigated the live Vercel "Backend is unavailable. Start the backend on port 8000." message after API-key entry.
+- Confirmed the production Vercel bundle for `resume-lens-eight.vercel.app` is compiled to call `https://resumelens-backend-mejp.onrender.com`, not `localhost:8000`.
+- Checked the Render backend health endpoint and CORS preflight for the Vercel origin.
+- Updated the frontend API wrapper so production backend failures mention the configured backend URL and Render wake-up behavior instead of local port 8000.
+
+### Failed (most valuable — include why)
+- Vercel CLI env/project listing timed out, likely because `npx vercel` was waiting on interactive setup. Used the Vercel connector and deployed bundle inspection instead.
+
+### Worked
+- `https://resumelens-backend-mejp.onrender.com/api/health` returned healthy.
+- CORS preflight from `https://resume-lens-eight.vercel.app` to `/api/models` returned allowed origin/methods/headers.
+- `/api/models` with an invalid OpenAI key returned a provider error through the backend, proving the live backend route is reachable.
+- `npm run lint` passed in `frontend/`.
+- `npm run build` passed in `frontend/`.
+
+### New rules added to AGENTS.md
+- None.
+
+### Open questions / blockers
+- Await Vercel production redeploy after the confirmed push to `main`.

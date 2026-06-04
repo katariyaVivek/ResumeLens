@@ -2,6 +2,20 @@ import type { ChatRequest, ChatResponse, IngestRequest, IngestResponse, ModelFet
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+function getBackendUnavailableMessage(error: unknown): string {
+  const action = error instanceof Error && error.name === "AbortError"
+    ? "Backend request timed out"
+    : "Backend is unavailable";
+  const backendUrl = BASE_URL.replace(/\/+$/, "");
+  const isLocalBackend = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(backendUrl);
+
+  if (isLocalBackend) {
+    return `${action}. Start the backend on port 8000.`;
+  }
+
+  return `${action} at ${backendUrl}. The Render backend may be waking up; wait a few seconds and try again.`;
+}
+
 async function authHeaders(): Promise<HeadersInit> {
   const { data: { session } } = await import("@/lib/supabase").then((m) => m.supabase.auth.getSession());
 
@@ -228,11 +242,11 @@ export async function fetchModels(apiKey: string, apiBase: string): Promise<Mode
       models: Array.isArray(data.models) ? data.models : [],
       error: typeof data.error === "string" ? data.error : undefined,
     };
-  } catch {
+  } catch (error: unknown) {
     clearTimeout(timer);
     return {
       models: [],
-      error: "Backend is unavailable. Start the backend on port 8000.",
+      error: getBackendUnavailableMessage(error),
     };
   }
 }
