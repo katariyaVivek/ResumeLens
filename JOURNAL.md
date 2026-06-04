@@ -300,3 +300,31 @@
 
 ### Open questions / blockers
 - Need push/redeploy to test whether the lighter CSV upload parser resolves Render 503 for the live full-file upload.
+
+## 2026-06-04
+
+### Attempted
+- Pushed the lighter CSV upload parser and retried the full `Resume.csv` upload against production.
+- Confirmed backend and frontend deployments for commit `3c46b70` completed successfully.
+- Direct full CSV upload still returned `502 Bad Gateway`; the stripped 15 MB `Resume_ingest.csv` also returned `502`.
+- Changed `/api/ingest/upload` to save uploads to a temporary file, return a queued job response immediately, and run parsing/embedding/upsert in a background task.
+- Added `/api/ingest/status/{job_id}` with a typed `IngestJobStatus` response.
+- Reduced embedding batch size and increased chunk size to lower memory pressure.
+
+### Failed (most valuable — include why)
+- Returning the same synchronous request after reducing CSV memory pressure was not enough; Render still killed or lost the request while indexing.
+
+### Worked
+- Full user CSV now parses to 2,483 documents and an estimated 9,603 chunks with the new chunk settings.
+- `python -m ruff check backend\routers\ingest.py backend\models\ingest.py backend\tests\test_ingest.py --ignore E402` passed.
+- `python -m ruff format --check backend\routers\ingest.py backend\models\ingest.py backend\tests\test_ingest.py` passed.
+- `python -m pytest backend\tests\test_ingest.py -q` passed.
+- `python -m compileall -q backend` passed.
+- `python -m mypy backend\routers\ingest.py backend\models\ingest.py backend\tests\test_ingest.py --explicit-package-bases --ignore-missing-imports --follow-imports=skip` passed.
+- `git diff --check` passed.
+
+### New rules added to AGENTS.md
+- None.
+
+### Open questions / blockers
+- Need deploy and live retry of the queued upload endpoint; background indexing may still need a durable worker if Render kills CPU-heavy background work.

@@ -4,13 +4,16 @@ sys.dont_write_bytecode = True
 
 import io
 import logging
+import tempfile
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from uuid import uuid4
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-from backend.models.ingest import IngestRequest, IngestResponse
+from backend.models.ingest import IngestJobStatus, IngestRequest, IngestResponse
 from backend.services.vector_store import VectorStoreService
 from backend.services.embeddings import EmbeddingsService
 
@@ -20,6 +23,7 @@ router = APIRouter()
 
 vector_store = VectorStoreService()
 embeddings = EmbeddingsService()
+ingest_jobs: Dict[str, IngestJobStatus] = {}
 
 CONTENT_COLUMN_NAMES = [
     "content",
@@ -34,9 +38,10 @@ CONTENT_COLUMN_NAMES = [
     "summary",
 ]
 ID_COLUMN_NAMES = ["id", "candidate_id", "resume_id", "name", "candidate"]
-EMBEDDING_BATCH_SIZE = 96
-CHUNK_SIZE = 1600
+EMBEDDING_BATCH_SIZE = 32
+CHUNK_SIZE = 2200
 CHUNK_OVERLAP = 200
+UPLOAD_CHUNK_SIZE = 1024 * 1024
 
 
 def _normalize_column_name(name: str) -> str:
@@ -163,6 +168,16 @@ def _parse_txt(content: bytes) -> List[Tuple[str, str]]:
     return [("1", text)]
 
 
+def _parse_path(path: Path, filename: str) -> List[Tuple[str, str]]:
+    ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+
+    if ext == "csv":
+        with path.open("rb") as file_buffer:
+            return _parse_csv_buffer(file_buffer)
+
+    return _parse_file(filename, path.read_bytes())
+
+
 async def _ingest_documents(
     pairs: List[Tuple[str, str]], source: str
 ) -> IngestResponse:
@@ -233,6 +248,65 @@ async def _embed_and_upsert_batch(
         )
 
 
+def _set_job_status(
+    job_id: str,
+    status: str,
+    filename: str,
+    message: str,
+    document_count: int = 0,
+    error: Optional[str] = None,
+) -> None:
+    ingest_jobs[job_id] = IngestJobStatus(
+        job_id=job_id,
+        status=status,
+        filename=filename,
+        document_count=document_count,
+        message=message,
+        error=error,
+    )
+
+
+async def _ingest_saved_file(job_id: str, file_path: str, filename: str) -> None:
+    path = Path(file_path)
+    try:
+        _set_job_status(
+            job_id=job_id,
+            status="running",
+            filename=filename,
+            message=f"Parsing {filename}",
+        )
+        pairs = _parse_path(path, filename)
+        _set_job_status(
+            job_id=job_id,
+            status="running",
+            filename=filename,
+            document_count=len(pairs),
+            message=f"Indexing {len(pairs)} resumes from {filename}",
+        )
+        response = await _ingest_documents(pairs, filename)
+        _set_job_status(
+            job_id=job_id,
+            status="succeeded",
+            filename=filename,
+            document_count=response.document_count,
+            message=response.message,
+        )
+    except Exception as e:
+        logger.exception("Background file upload ingest failed")
+        _set_job_status(
+            job_id=job_id,
+            status="failed",
+            filename=filename,
+            message=f"Ingest failed for {filename}",
+            error=f"{type(e).__name__}: {str(e)}",
+        )
+    finally:
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            logger.warning("Could not remove temporary ingest file: %s", path)
+
+
 @router.post("/ingest", response_model=IngestResponse)
 async def ingest(
     request: IngestRequest,
@@ -286,20 +360,57 @@ async def ingest(
         )
 
 
-@router.post("/ingest/upload", response_model=IngestResponse)
+@router.get("/ingest/status/{job_id}", response_model=IngestJobStatus)
+async def ingest_status(job_id: str) -> IngestJobStatus:
+    job = ingest_jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Ingest job not found")
+    return job
+
+
+@router.post("/ingest/upload", response_model=IngestResponse, status_code=202)
 async def ingest_upload(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-):
+) -> IngestResponse:
     """Ingest resumes from an uploaded file (CSV, PDF, or TXT)."""
     try:
         filename = file.filename or "upload"
         ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-        if ext == "csv":
-            pairs = _parse_csv_buffer(file.file)
-        else:
-            content = await file.read()
-            pairs = _parse_file(filename, content)
-        return await _ingest_documents(pairs, filename)
+        if ext not in {"csv", "pdf", "txt"}:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type: .{ext}. Use .csv, .pdf, or .txt",
+            )
+
+        job_id = uuid4().hex
+        suffix = f".{ext}" if ext else ""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+            temp_path = Path(temp_file.name)
+            while True:
+                chunk = await file.read(UPLOAD_CHUNK_SIZE)
+                if not chunk:
+                    break
+                temp_file.write(chunk)
+
+        _set_job_status(
+            job_id=job_id,
+            status="queued",
+            filename=filename,
+            message=f"Queued ingestion for {filename}",
+        )
+        background_tasks.add_task(_ingest_saved_file, job_id, str(temp_path), filename)
+
+        return IngestResponse(
+            success=True,
+            document_count=0,
+            message=(
+                f"Queued ingestion for {filename}. Indexing continues in the background. "
+                f"Job ID: {job_id}"
+            ),
+            document_ids=[],
+            job_id=job_id,
+        )
 
     except HTTPException:
         raise
