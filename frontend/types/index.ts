@@ -34,6 +34,8 @@ export interface IngestResponse {
   document_count: number;
   message: string;
   document_ids?: string[];
+  job_id?: string;
+  chunk_count?: number;
 }
 
 export interface ModelFetchResult {

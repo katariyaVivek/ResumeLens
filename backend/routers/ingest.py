@@ -7,7 +7,7 @@ import io
 import logging
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from uuid import uuid4
 
 import pandas as pd
@@ -39,7 +39,7 @@ CONTENT_COLUMN_NAMES = [
     "summary",
 ]
 ID_COLUMN_NAMES = ["id", "candidate_id", "resume_id", "name", "candidate"]
-EMBEDDING_BATCH_SIZE = 32
+EMBEDDING_BATCH_SIZE = 64
 CHUNK_SIZE = 2200
 CHUNK_OVERLAP = 200
 UPLOAD_CHUNK_SIZE = 1024 * 1024
@@ -180,7 +180,9 @@ def _parse_path(path: Path, filename: str) -> List[Tuple[str, str]]:
 
 
 async def _ingest_documents(
-    pairs: List[Tuple[str, str]], source: str
+    pairs: List[Tuple[str, str]],
+    source: str,
+    progress_callback: Optional[Callable[[int], None]] = None,
 ) -> IngestResponse:
     """Chunk, embed, and upsert documents to vector store."""
     if not pairs:
@@ -213,18 +215,23 @@ async def _ingest_documents(
 
             if len(chunk_batch) >= EMBEDDING_BATCH_SIZE:
                 await _embed_and_upsert_batch(chunk_batch, id_batch, metadata_batch)
+                if progress_callback is not None:
+                    progress_callback(total_chunks)
                 chunk_batch = []
                 id_batch = []
                 metadata_batch = []
 
     if chunk_batch:
         await _embed_and_upsert_batch(chunk_batch, id_batch, metadata_batch)
+        if progress_callback is not None:
+            progress_callback(total_chunks)
 
     return IngestResponse(
         success=True,
         document_count=len(pairs),
         message=f"Successfully ingested {len(pairs)} resumes from {source} ({total_chunks} chunks)",
         document_ids=[pid for pid, _ in pairs],
+        chunk_count=total_chunks,
     )
 
 
@@ -256,6 +263,8 @@ def _set_job_status(
     message: str,
     document_count: int = 0,
     error: Optional[str] = None,
+    chunks_indexed: int = 0,
+    chunks_total: Optional[int] = None,
 ) -> None:
     ingest_jobs[job_id] = IngestJobStatus(
         job_id=job_id,
@@ -264,6 +273,8 @@ def _set_job_status(
         document_count=document_count,
         message=message,
         error=error,
+        chunks_indexed=chunks_indexed,
+        chunks_total=chunks_total,
     )
 
 
@@ -284,13 +295,26 @@ def _ingest_saved_file(job_id: str, file_path: str, filename: str) -> None:
             document_count=len(pairs),
             message=f"Indexing {len(pairs)} resumes from {filename}",
         )
-        response = asyncio.run(_ingest_documents(pairs, filename))
+
+        def update_progress(chunks_indexed: int) -> None:
+            _set_job_status(
+                job_id=job_id,
+                status="running",
+                filename=filename,
+                document_count=len(pairs),
+                message=f"Indexed {chunks_indexed} chunks from {filename}",
+                chunks_indexed=chunks_indexed,
+            )
+
+        response = asyncio.run(_ingest_documents(pairs, filename, update_progress))
         _set_job_status(
             job_id=job_id,
             status="succeeded",
             filename=filename,
             document_count=response.document_count,
             message=response.message,
+            chunks_indexed=response.chunk_count or 0,
+            chunks_total=response.chunk_count,
         )
     except Exception as e:
         logger.exception("Background file upload ingest failed")
