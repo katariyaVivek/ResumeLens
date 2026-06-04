@@ -2,6 +2,7 @@ import sys
 
 sys.dont_write_bytecode = True
 
+import asyncio
 import io
 import logging
 import tempfile
@@ -10,7 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from uuid import uuid4
 
 import pandas as pd
-from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from backend.models.ingest import IngestJobStatus, IngestRequest, IngestResponse
@@ -370,7 +371,6 @@ async def ingest_status(job_id: str) -> IngestJobStatus:
 
 @router.post("/ingest/upload", response_model=IngestResponse, status_code=202)
 async def ingest_upload(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
 ) -> IngestResponse:
     """Ingest resumes from an uploaded file (CSV, PDF, or TXT)."""
@@ -399,7 +399,7 @@ async def ingest_upload(
             filename=filename,
             message=f"Queued ingestion for {filename}",
         )
-        background_tasks.add_task(_ingest_saved_file, job_id, str(temp_path), filename)
+        asyncio.create_task(_ingest_saved_file(job_id, str(temp_path), filename))
 
         return IngestResponse(
             success=True,

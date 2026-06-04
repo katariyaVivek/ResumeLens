@@ -328,3 +328,27 @@
 
 ### Open questions / blockers
 - Need deploy and live retry of the queued upload endpoint; background indexing may still need a durable worker if Render kills CPU-heavy background work.
+
+## 2026-06-04
+
+### Attempted
+- Deployed the first queued upload implementation and retried production uploads.
+- Full 54 MB `Resume.csv` still returned `502`.
+- Stripped 15 MB `Resume_ingest.csv` did not return within a 180 second direct request timeout.
+- Replaced FastAPI `BackgroundTasks` with `asyncio.create_task` so the response can close immediately after saving the upload.
+
+### Failed (most valuable — include why)
+- FastAPI `BackgroundTasks` was still not sufficient for this path because the client request remained tied up while the heavy ingestion task ran.
+
+### Worked
+- `python -m ruff check backend\routers\ingest.py backend\models\ingest.py backend\tests\test_ingest.py --ignore E402` passed.
+- `python -m ruff format --check backend\routers\ingest.py backend\models\ingest.py backend\tests\test_ingest.py` passed.
+- `python -m pytest backend\tests\test_ingest.py -q` passed.
+- `python -m compileall -q backend` passed.
+- `python -m mypy backend\routers\ingest.py backend\models\ingest.py backend\tests\test_ingest.py --explicit-package-bases --ignore-missing-imports --follow-imports=skip` passed.
+
+### New rules added to AGENTS.md
+- None.
+
+### Open questions / blockers
+- Need deploy and retry with detached ingestion task.
