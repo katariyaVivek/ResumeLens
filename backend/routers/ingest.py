@@ -3,6 +3,7 @@ import sys
 sys.dont_write_bytecode = True
 
 import asyncio
+import gc
 import io
 import logging
 import tempfile
@@ -39,8 +40,8 @@ CONTENT_COLUMN_NAMES = [
     "summary",
 ]
 ID_COLUMN_NAMES = ["id", "candidate_id", "resume_id", "name", "candidate"]
-EMBEDDING_BATCH_SIZE = 64
-CHUNK_SIZE = 2200
+EMBEDDING_BATCH_SIZE = 32
+CHUNK_SIZE = 3000
 CHUNK_OVERLAP = 200
 UPLOAD_CHUNK_SIZE = 1024 * 1024
 
@@ -288,6 +289,7 @@ def _ingest_saved_file(job_id: str, file_path: str, filename: str) -> None:
             message=f"Parsing {filename}",
         )
         pairs = _parse_path(path, filename)
+        gc.collect()
         _set_job_status(
             job_id=job_id,
             status="running",
