@@ -237,3 +237,38 @@
 
 ### Open questions / blockers
 - Await Vercel production redeploy after the confirmed push to `main`.
+
+## 2026-06-04
+
+### Attempted
+- Investigated live-site file upload failure for `C:\Users\Vivek\Downloads\Resume\Resume.csv`.
+- Checked the CSV without printing resume row contents: 56 MB, 2,484 rows, columns `ID`, `Resume_str`, `Resume_html`, `Category`.
+- Verified Render backend health and CORS preflight for `/api/ingest/upload` from the Vercel origin.
+- Updated backend CSV parsing to recognize `resume_str`/related resume text names and avoid HTML columns when guessing text content.
+- Updated ingestion to embed and upsert bounded batches instead of building one giant embedding/upsert payload.
+- Updated the upload modal to default to File mode and reject local Windows/file paths pasted into URL mode with a specific instruction.
+- Added parser tests for `Resume_str` vs `Resume_html` behavior.
+- Used the in-app browser against the production Vercel page and confirmed the live modal is still the old deployment behavior for this flow.
+- Sent a tiny multipart probe to the live Render `/api/ingest/upload` route from the Vercel origin; it returned 200, confirming the endpoint and CORS are reachable.
+
+### Failed (most valuable — include why)
+- Full-repo mypy and narrowed mypy without skipped imports timed out; the narrowed run with `--follow-imports=skip` passed. The timeout appears tied to heavy dependency/import analysis rather than an ingest type error.
+- The production site still fails for the user's large CSV because this fix has not yet been pushed/deployed.
+
+### Worked
+- Parser-only check against the user's CSV found 2,483 non-empty resumes and selected the plain text column.
+- Estimated chunk count with the new settings is 12,901 chunks.
+- `python -m ruff check backend\routers\ingest.py backend\tests\test_ingest.py --ignore E402` passed.
+- `python -m ruff format --check backend\routers\ingest.py backend\tests\test_ingest.py` passed after formatting `backend\routers\ingest.py`.
+- `python -m compileall -q backend` passed.
+- `python -m pytest backend\tests\test_ingest.py -q` passed.
+- `python -m mypy backend\routers\ingest.py backend\tests\test_ingest.py --explicit-package-bases --ignore-missing-imports --follow-imports=skip` passed.
+- `npm run lint` passed in `frontend/`.
+- `npm run build` passed in `frontend/`.
+- `git diff --check` passed.
+
+### New rules added to AGENTS.md
+- None.
+
+### Open questions / blockers
+- Backend fix is local only until committed and pushed; Render production needs a redeploy before the live website benefits.

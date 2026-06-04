@@ -2,8 +2,9 @@ import sys
 
 sys.dont_write_bytecode = True
 
-import logging
 import io
+import logging
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, UploadFile, File
@@ -20,8 +21,65 @@ router = APIRouter()
 vector_store = VectorStoreService()
 embeddings = EmbeddingsService()
 
+CONTENT_COLUMN_NAMES = [
+    "content",
+    "text",
+    "resume",
+    "resume_text",
+    "resume_str",
+    "resume_string",
+    "resume_description",
+    "description",
+    "body",
+    "summary",
+]
+ID_COLUMN_NAMES = ["id", "candidate_id", "resume_id", "name", "candidate"]
+EMBEDDING_BATCH_SIZE = 96
+CHUNK_SIZE = 1600
+CHUNK_OVERLAP = 200
 
-def _parse_file(filename: str, content: bytes) -> list[tuple[str, str]]:
+
+def _normalize_column_name(name: str) -> str:
+    return name.lower().strip().replace(" ", "_").replace("-", "_")
+
+
+def _detect_content_column(df: pd.DataFrame) -> str:
+    columns = [_normalize_column_name(str(column)) for column in df.columns]
+
+    for name in CONTENT_COLUMN_NAMES:
+        if name in columns:
+            return str(df.columns[columns.index(name)])
+
+    text_cols = [
+        column
+        for column in df.select_dtypes(include=["object"]).columns
+        if "html" not in _normalize_column_name(str(column))
+    ]
+
+    if not text_cols:
+        text_cols = list(df.select_dtypes(include=["object"]).columns)
+
+    if not text_cols:
+        raise HTTPException(
+            status_code=400,
+            detail="Could not find a text content column in CSV. Name it 'content', 'text', 'resume', or 'resume_str'.",
+        )
+
+    lengths = df[text_cols].astype(str).apply(lambda series: series.str.len().mean())
+    return str(lengths.idxmax())
+
+
+def _detect_id_column(df: pd.DataFrame) -> Optional[str]:
+    columns = [_normalize_column_name(str(column)) for column in df.columns]
+
+    for name in ID_COLUMN_NAMES:
+        if name in columns:
+            return str(df.columns[columns.index(name)])
+
+    return None
+
+
+def _parse_file(filename: str, content: bytes) -> List[Tuple[str, str]]:
     """Parse uploaded file into [(id, text), ...] pairs."""
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
@@ -38,49 +96,26 @@ def _parse_file(filename: str, content: bytes) -> list[tuple[str, str]]:
         )
 
 
-def _parse_csv(content: bytes) -> list[tuple[str, str]]:
+def _parse_csv(content: bytes) -> List[Tuple[str, str]]:
     """Parse CSV — auto-detect content and id columns."""
     df = pd.read_csv(io.BytesIO(content))
-    columns = [c.lower().strip() for c in df.columns]
+    content_col = _detect_content_column(df)
+    id_col = _detect_id_column(df)
 
-    # Auto-detect content column
-    content_col = None
-    for name in ["content", "text", "resume", "description", "body", "summary"]:
-        if name in columns:
-            content_col = df.columns[columns.index(name)]
-            break
-    if not content_col:
-        # Use the column with longest average text
-        text_cols = df.select_dtypes(include=["object"]).columns
-        if len(text_cols) > 0:
-            content_col = text_cols[
-                df[text_cols].astype(str).apply(len).mean().argmax()
-            ]
-        else:
-            raise HTTPException(
-                status_code=400,
-                detail="Could not find a text content column in CSV. Name it 'content', 'text', or 'resume'.",
-            )
-
-    # Auto-detect ID column
-    id_col = None
-    for name in ["id", "candidate_id", "resume_id", "name", "candidate"]:
-        if name in columns:
-            id_col = df.columns[columns.index(name)]
-            break
-    if not id_col:
-        id_col = None  # Will auto-generate IDs
-
-    documents = df[content_col].astype(str).tolist()
-    if id_col:
+    documents = df[content_col].fillna("").astype(str).str.strip().tolist()
+    if id_col is not None:
         ids = df[id_col].astype(str).tolist()
     else:
         ids = [str(i + 1) for i in range(len(documents))]
 
-    return list(zip(ids, documents))
+    return [
+        (doc_id, document)
+        for doc_id, document in zip(ids, documents)
+        if document and document.lower() != "nan"
+    ]
 
 
-def _parse_pdf(content: bytes) -> list[tuple[str, str]]:
+def _parse_pdf(content: bytes) -> List[Tuple[str, str]]:
     """Parse PDF — each PDF is one document."""
     try:
         from PyPDF2 import PdfReader
@@ -104,7 +139,7 @@ def _parse_pdf(content: bytes) -> list[tuple[str, str]]:
     return [("1", text)]
 
 
-def _parse_txt(content: bytes) -> list[tuple[str, str]]:
+def _parse_txt(content: bytes) -> List[Tuple[str, str]]:
     """Parse plain text — entire file is one document."""
     text = content.decode("utf-8", errors="replace").strip()
     if not text:
@@ -113,40 +148,66 @@ def _parse_txt(content: bytes) -> list[tuple[str, str]]:
 
 
 async def _ingest_documents(
-    pairs: list[tuple[str, str]], source: str
+    pairs: List[Tuple[str, str]], source: str
 ) -> IngestResponse:
     """Chunk, embed, and upsert documents to vector store."""
+    if not pairs:
+        raise HTTPException(status_code=400, detail="No resume text found to ingest.")
+
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1024,
-        chunk_overlap=500,
+        chunk_size=CHUNK_SIZE,
+        chunk_overlap=CHUNK_OVERLAP,
     )
 
-    all_chunks = []
-    all_ids = []
-    all_metadata = []
+    chunk_batch: List[str] = []
+    id_batch: List[str] = []
+    metadata_batch: List[Dict[str, Any]] = []
+    total_chunks = 0
 
     for doc_id, doc_text in pairs:
         chunks = text_splitter.split_text(str(doc_text))
         for chunk in chunks:
-            all_chunks.append(chunk)
-            chunk_id = f"{doc_id}_{len(all_chunks)}"
-            all_ids.append(chunk_id)
-            all_metadata.append(
+            total_chunks += 1
+            chunk_batch.append(chunk)
+            id_batch.append(f"{doc_id}_{total_chunks}")
+            metadata_batch.append(
                 {
                     "id": doc_id,
-                    "chunk_index": len(all_chunks),
+                    "chunk_index": total_chunks,
                     "resume_id": doc_id,
                     "document": chunk,
                 }
             )
 
-    embeddings_list = embeddings.embed_documents(all_chunks)
+            if len(chunk_batch) >= EMBEDDING_BATCH_SIZE:
+                await _embed_and_upsert_batch(chunk_batch, id_batch, metadata_batch)
+                chunk_batch = []
+                id_batch = []
+                metadata_batch = []
+
+    if chunk_batch:
+        await _embed_and_upsert_batch(chunk_batch, id_batch, metadata_batch)
+
+    return IngestResponse(
+        success=True,
+        document_count=len(pairs),
+        message=f"Successfully ingested {len(pairs)} resumes from {source} ({total_chunks} chunks)",
+        document_ids=[pid for pid, _ in pairs],
+    )
+
+
+async def _embed_and_upsert_batch(
+    chunks: List[str],
+    ids: List[str],
+    metadata: List[Dict[str, Any]],
+) -> None:
+    embeddings_list = embeddings.embed_documents(chunks)
 
     success = await vector_store.upsert(
-        ids=all_ids,
+        ids=ids,
         embeddings=embeddings_list,
-        documents=all_chunks,
-        metadata=all_metadata,
+        documents=chunks,
+        metadata=metadata,
     )
 
     if not success:
@@ -154,13 +215,6 @@ async def _ingest_documents(
             status_code=500,
             detail="Failed to upsert documents to vector store",
         )
-
-    return IngestResponse(
-        success=True,
-        document_count=len(pairs),
-        message=f"Successfully ingested {len(pairs)} resumes from {source}",
-        document_ids=[pid for pid, _ in pairs],
-    )
 
 
 @router.post("/ingest", response_model=IngestResponse)

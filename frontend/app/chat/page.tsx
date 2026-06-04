@@ -128,12 +128,17 @@ interface UploadModalProps {
   onSuccess: (message: string) => void;
 }
 
+function isLocalFilePath(value: string): boolean {
+  const trimmed = value.trim();
+  return /^[a-zA-Z]:[\\/]/.test(trimmed) || trimmed.startsWith("\\\\") || trimmed.toLowerCase().startsWith("file:");
+}
+
 function UploadModal({ onClose, onSuccess }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
-  const [mode, setMode] = useState<"url" | "file">("url");
+  const [mode, setMode] = useState<"url" | "file">("file");
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -165,6 +170,11 @@ function UploadModal({ onClose, onSuccess }: UploadModalProps) {
       if (mode === "url") {
         if (!fileUrl.trim()) {
           setError("Enter a CSV URL or storage path.");
+          return;
+        }
+
+        if (isLocalFilePath(fileUrl)) {
+          setError("Local file paths are not reachable from the live backend. Switch to File and select the CSV.");
           return;
         }
 
