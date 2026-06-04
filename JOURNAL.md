@@ -272,3 +272,31 @@
 
 ### Open questions / blockers
 - Backend fix is local only until committed and pushed; Render production needs a redeploy before the live website benefits.
+
+## 2026-06-04
+
+### Attempted
+- Used Playwright browser control on the live Vercel site to select `C:\Users\Vivek\Downloads\Resume\Resume.csv` and click Ingest.
+- Confirmed the live frontend is updated to File-first upload mode.
+- Captured the browser console error for the real full-file upload.
+- Posted the same full CSV directly to the Render backend upload route with the Vercel origin header.
+- Updated backend CSV upload parsing to avoid `await file.read()` for CSV files and to reread only detected content/id columns instead of loading `Resume_html`.
+
+### Failed (most valuable — include why)
+- Live browser upload still showed `Failed to fetch`; browser console showed Render returned an error without `Access-Control-Allow-Origin`, which Chrome masked as a CORS/fetch failure.
+- Direct full CSV upload to Render returned `503 Service Unavailable` after about 24 seconds, confirming the backend instance could not handle the request path currently deployed.
+
+### Worked
+- The new file-buffer parser extracts the same 2,483 non-empty resumes from the user's CSV while avoiding the `Resume_html` column.
+- `python -m ruff check backend\routers\ingest.py backend\tests\test_ingest.py --ignore E402` passed.
+- `python -m ruff format --check backend\routers\ingest.py backend\tests\test_ingest.py` passed.
+- `python -m pytest backend\tests\test_ingest.py -q` passed.
+- `python -m compileall -q backend` passed.
+- `python -m mypy backend\routers\ingest.py backend\tests\test_ingest.py --explicit-package-bases --ignore-missing-imports --follow-imports=skip` passed.
+- `git diff --check` passed.
+
+### New rules added to AGENTS.md
+- None.
+
+### Open questions / blockers
+- Need push/redeploy to test whether the lighter CSV upload parser resolves Render 503 for the live full-file upload.

@@ -97,10 +97,26 @@ def _parse_file(filename: str, content: bytes) -> List[Tuple[str, str]]:
 
 
 def _parse_csv(content: bytes) -> List[Tuple[str, str]]:
+    return _parse_csv_buffer(io.BytesIO(content))
+
+
+def _parse_csv_buffer(buffer: Any) -> List[Tuple[str, str]]:
     """Parse CSV — auto-detect content and id columns."""
-    df = pd.read_csv(io.BytesIO(content))
-    content_col = _detect_content_column(df)
-    id_col = _detect_id_column(df)
+    if hasattr(buffer, "seek"):
+        buffer.seek(0)
+
+    sample_df = pd.read_csv(buffer, nrows=100)
+    content_col = _detect_content_column(sample_df)
+    id_col = _detect_id_column(sample_df)
+
+    if hasattr(buffer, "seek"):
+        buffer.seek(0)
+
+    usecols = [content_col]
+    if id_col is not None:
+        usecols.append(id_col)
+
+    df = pd.read_csv(buffer, usecols=usecols)
 
     documents = df[content_col].fillna("").astype(str).str.strip().tolist()
     if id_col is not None:
@@ -276,9 +292,13 @@ async def ingest_upload(
 ):
     """Ingest resumes from an uploaded file (CSV, PDF, or TXT)."""
     try:
-        content = await file.read()
         filename = file.filename or "upload"
-        pairs = _parse_file(filename, content)
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        if ext == "csv":
+            pairs = _parse_csv_buffer(file.file)
+        else:
+            content = await file.read()
+            pairs = _parse_file(filename, content)
         return await _ingest_documents(pairs, filename)
 
     except HTTPException:
