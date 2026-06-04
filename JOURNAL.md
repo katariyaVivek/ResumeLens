@@ -376,3 +376,29 @@
 
 ### Open questions / blockers
 - Need deploy and retry status polling with threaded background ingestion.
+
+## 2026-06-04
+
+### Attempted
+- Verified backend workflow success for `0609ca4`, then tested production upload/status against the live Render backend from the Vercel origin.
+- Confirmed `Resume_ingest.csv` returned `202 Accepted` with CORS headers and a job ID, and health stayed responsive while indexing ran.
+- Added ingestion job progress fields (`chunks_indexed`, `chunks_total`) and response `chunk_count`, synced the frontend type, and pushed `93516e9`.
+- Retried the full 54 MB `Resume.csv`; it returned `202 Accepted`, but the 64-size embed batch caused Render to restart and lose the job.
+- Reduced production ingest pressure by returning to batch size 32, increasing chunk size to 3000 to reduce total chunks, and collecting parser memory before embedding; pushed `153db54`.
+- Retried the full `Resume.csv` after Render picked up `153db54`.
+
+### Failed (most valuable — include why)
+- GitHub Actions backend deploy step still succeeds even when `RENDER_API_KEY` and `RENDER_SERVICE_ID` are empty; Render deployment appears to rely on Render's GitHub auto-deploy instead.
+- The 64-size batch was too aggressive for Render free tier during full-file ingestion and caused a service restart.
+
+### Worked
+- Production full `Resume.csv` upload now returns `202 Accepted` with CORS headers instead of browser-visible `Failed to fetch`.
+- Live job `1a9bf126fbf0481993767b1168b5f8ae` parsed 2,483 resumes and progressed to 224 indexed chunks while `/api/health` stayed responsive.
+- Checks passed: focused backend ruff check/format, pytest ingest tests, mypy, compileall, frontend lint, frontend build, and `git diff --check`.
+
+### New rules added to AGENTS.md
+- None.
+
+### Open questions / blockers
+- Full indexing is still running in the background on Render and may take a long time on the free tier.
+- Render deploy credentials should be added to GitHub Actions or the deploy step should fail fast when secrets are missing.
