@@ -352,3 +352,27 @@
 
 ### Open questions / blockers
 - Need deploy and retry with detached ingestion task.
+
+## 2026-06-04
+
+### Attempted
+- Deployed detached queued ingestion and retried uploads.
+- The 15 MB stripped ingestion CSV returned `202` with a job ID, proving the request can now queue successfully.
+- Polling job status and health timed out while the background task embedded documents.
+- Moved ingestion work into a worker thread using `asyncio.to_thread` so CPU-heavy embedding does not block the FastAPI event loop.
+
+### Failed (most valuable — include why)
+- `asyncio.create_task` alone detached the response, but the sync embedding work still blocked the main event loop, making status and health checks unresponsive during indexing.
+
+### Worked
+- `python -m ruff check backend\routers\ingest.py backend\models\ingest.py backend\tests\test_ingest.py --ignore E402` passed.
+- `python -m ruff format --check backend\routers\ingest.py backend\models\ingest.py backend\tests\test_ingest.py` passed.
+- `python -m pytest backend\tests\test_ingest.py -q` passed.
+- `python -m compileall -q backend` passed.
+- `python -m mypy backend\routers\ingest.py backend\models\ingest.py backend\tests\test_ingest.py --explicit-package-bases --ignore-missing-imports --follow-imports=skip` passed.
+
+### New rules added to AGENTS.md
+- None.
+
+### Open questions / blockers
+- Need deploy and retry status polling with threaded background ingestion.

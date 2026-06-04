@@ -267,7 +267,7 @@ def _set_job_status(
     )
 
 
-async def _ingest_saved_file(job_id: str, file_path: str, filename: str) -> None:
+def _ingest_saved_file(job_id: str, file_path: str, filename: str) -> None:
     path = Path(file_path)
     try:
         _set_job_status(
@@ -284,7 +284,7 @@ async def _ingest_saved_file(job_id: str, file_path: str, filename: str) -> None
             document_count=len(pairs),
             message=f"Indexing {len(pairs)} resumes from {filename}",
         )
-        response = await _ingest_documents(pairs, filename)
+        response = asyncio.run(_ingest_documents(pairs, filename))
         _set_job_status(
             job_id=job_id,
             status="succeeded",
@@ -399,7 +399,9 @@ async def ingest_upload(
             filename=filename,
             message=f"Queued ingestion for {filename}",
         )
-        asyncio.create_task(_ingest_saved_file(job_id, str(temp_path), filename))
+        asyncio.create_task(
+            asyncio.to_thread(_ingest_saved_file, job_id, str(temp_path), filename)
+        )
 
         return IngestResponse(
             success=True,
